@@ -29,13 +29,13 @@ void solver(System sys) {
 
     #pragma omp for
         for(j = 0; j < Ny; j++) {
-            my = j*Nx ;
+            my = j*Nx;
             for(i = 0; i < Nx; i++){
-                b[i] = sys.rhs[i + my] ;
+                b[i] = sys.rhs[i + my];
             }
             DST(dst, b, bhat, plan, in, out);
             for(i = 0; i < Nx; i++){
-                rhat[i + my] = bhat[i] ;
+                rhat[i + my] = bhat[i];
             }
         }
         
@@ -56,11 +56,11 @@ void solver(System sys) {
         for(j = 0; j < Ny; j++) {
             my = j*Nx;
             for(i = 0; i < Nx; i++){
-                b[i] = xhat[j + i*Ny] ;
+                b[i] = xhat[j + i*Ny];
             }
             DST(dst, b, bhat, plan, in, out);
             for(i = 0; i < Nx; i++){
-                sys.sol[i + my] = bhat[i] ;
+                sys.sol[i + my] = bhat[i];
             }
         }
             
