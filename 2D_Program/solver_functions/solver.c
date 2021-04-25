@@ -16,16 +16,16 @@ void solver(System sys) {
 #pragma omp parallel private (i,j,mx,my)
     {
             
-        double *in        = (double *) fftw_malloc(sizeof(double) * N);
-        fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC);
+        double *in        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
+        fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
 
         double _Complex *b    = (double _Complex *) malloc(Nx * sizeof(double _Complex));
         double _Complex *bhat = (double _Complex *) malloc(Nx * sizeof(double _Complex));
         double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
-        fftw_plan plan;
+        fftw_plan plan; /********************* FFTW *********************/
             
     #pragma omp critical (make_plan)
-        { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); }
+        { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
 
     #pragma omp for
         for(j = 0; j < Ny; j++) {
@@ -33,7 +33,7 @@ void solver(System sys) {
             for(i = 0; i < Nx; i++){
                 b[i] = sys.rhs[i + my];
             }
-            DST(dst, b, bhat, plan, in, out);
+            DST(dst, b, bhat, plan, in, out); /********************* FFTW contained inside *********************/
             for(i = 0; i < Nx; i++){
                 rhat[i + my] = bhat[i];
             }
@@ -58,15 +58,15 @@ void solver(System sys) {
             for(i = 0; i < Nx; i++){
                 b[i] = xhat[j + i*Ny];
             }
-            DST(dst, b, bhat, plan, in, out);
+            DST(dst, b, bhat, plan, in, out); /********************* FFTW contained inside *********************/
             for(i = 0; i < Nx; i++){
                 sys.sol[i + my] = bhat[i];
             }
         }
             
-        fftw_destroy_plan(plan);
+        fftw_destroy_plan(plan); /********************* FFTW *********************/
         free(in); in = NULL;
-        fftw_free(out); out = NULL;
+        fftw_free(out); out = NULL; /********************* FFTW *********************/
         free(b); b = NULL;
         free(bhat); bhat = NULL;
         free(y); y = NULL;
