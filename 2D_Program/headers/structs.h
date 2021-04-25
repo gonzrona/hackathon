@@ -4,7 +4,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include <complex.h>
-#include <fftw3.h>
+// #include <fftw3.h>
 
 #define ind(i,j,Nx) i+(j)*(Nx)
 #define ind_e(i,j,Nx) i+1+(j+1)*(Nx+2)

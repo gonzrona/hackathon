@@ -1,8 +1,9 @@
-CC = gcc-10
+CC = gcc
 CFLAGS = -Wall -g -fopenmp -O0
-INCLUDES = -I/usr/local/include
-LFLAGS = -L/usr/local/lib
-LIBS = -lfftw3_omp -lfftw3 -lm
+INCLUDES = -I/usr/local/include -I/usr/local/cuda/include
+LFLAGS = -L/usr/local/lib -L/usr/local/cuda/lib64 
+# LIBS = -lfftw3_omp -lfftw3 -lm
+LIBS = -lcufft -lcufftw -lm -lnvToolsExt
 SRCS = $(wildcard *.c) $(wildcard */*.c)
 OBJS = $(SRCS:.c=.o)
 MAIN = Direct_Solver
