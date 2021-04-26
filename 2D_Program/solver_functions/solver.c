@@ -27,6 +27,7 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 //                        NVTX                         
 //*****************************************************
 
+
 void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out);
 
 void solver(System sys) {
@@ -41,25 +42,35 @@ void solver(System sys) {
     
     int N = 2*Nx + 2, NC = (N/2) + 1;
     dst.Nx = Nx; dst.N = N; dst.coef = sqrt(2.0/(Nx+1));
+
+    printf("Nx = %d: Ny = %d: Nxy = %d: N = %d: NC = %d\n", Nx, Ny, Nxy, N, NC);
     
-// #pragma omp parallel private (i,j,mx,my)
-//     {
+#if USE_OMP
+#pragma omp parallel private (i,j,mx,my)
+    {
+#endif
             
         double *in        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
+        printf("Size of in = %lu\n", sizeof(double) * N);
         fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
 
         double _Complex *b    = (double _Complex *) malloc(Nx * sizeof(double _Complex));
         double _Complex *bhat = (double _Complex *) malloc(Nx * sizeof(double _Complex));
         double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
         fftw_plan plan; /********************* FFTW *********************/
-            
-    // #pragma omp critical (make_plan)
-        PUSH_RANGE("1st fffw_execute", 1)
-        { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
-        POP_RANGE
 
-    // #pragma omp for
-        PUSH_RANGE("1st DST", 1)
+    PUSH_RANGE("1st fffw_plan", 1)     
+#if USE_OMP   
+    #pragma omp critical (make_plan)
+#endif
+        { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
+        // { plan2 = fftw_plan_many_dft_r2c ( 1, n, Ny, in, inemded, 1, Nx, out, outemded, 1, Nx, FFTW_MEASURE ); } /********************* FFTW *********************/
+    POP_RANGE
+
+    PUSH_RANGE("1st DST", 1)
+#if USE_OMP
+    #pragma omp for  
+#endif  
         for(j = 0; j < Ny; j++) {
             my = j*Nx;
             for(i = 0; i < Nx; i++){
@@ -70,10 +81,12 @@ void solver(System sys) {
                 rhat[i + my] = bhat[i];
             }
         }
-        POP_RANGE
+    POP_RANGE
         
-    // #pragma omp for
-        PUSH_RANGE("Middle stuff", 2)
+    PUSH_RANGE("Middle stuff", 2)
+#if USE_OMP
+    #pragma omp for
+#endif
         for(i = 0; i < Nx; i++){
             y[0] = rhat[i];
             mx = i*Ny ;
@@ -85,10 +98,12 @@ void solver(System sys) {
                 xhat[j + mx] =  ( y[j] - sys.Up[j + mx] * xhat[j + 1 + mx] )/sys.U[j + mx] ;
             }
         }
-        POP_RANGE
+    POP_RANGE
       
-    // #pragma omp for
-        PUSH_RANGE("2nd DST", 3)
+    PUSH_RANGE("2nd DST", 3)
+#if USE_OMP
+    #pragma omp for
+#endif
         for(j = 0; j < Ny; j++) {
             my = j*Nx;
             for(i = 0; i < Nx; i++){
@@ -99,7 +114,7 @@ void solver(System sys) {
                 sys.sol[i + my] = bhat[i];
             }
         }
-        POP_RANGE
+    POP_RANGE
         
         PUSH_RANGE("Cleanup", 4)
         fftw_destroy_plan(plan); /********************* FFTW *********************/
@@ -108,7 +123,9 @@ void solver(System sys) {
         free(b); b = NULL;
         free(bhat); bhat = NULL;
         free(y); y = NULL;
-    // }
+#if USE_OMP
+    }
+#endif
 
     free(rhat); rhat = NULL;
     free(xhat); xhat = NULL;
