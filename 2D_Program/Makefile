@@ -8,7 +8,7 @@ SRCS = $(wildcard *.c) $(wildcard */*.c)
 OBJS = $(SRCS:.c=.o)
 MAIN = Direct_Solver
 
-ifeq ($(USE_OMP), 0)
+ifneq ($(USE_OMP), 0)
 	CFLAGS += -USE_OMP
 	LIBS = -lfftw3_omp -lfftw3 -lm -lnvToolsExt
 else
