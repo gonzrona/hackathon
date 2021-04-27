@@ -1,5 +1,7 @@
 #include "../headers/structs.h"
 
+#include<time.h>
+
 double cpuSecond() {
     struct timeval tp;
     gettimeofday(&tp,NULL);
@@ -27,5 +29,3 @@ Time toc(Time time){
     
     return time;
 }
-
-
