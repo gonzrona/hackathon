@@ -1,11 +1,13 @@
 #include "../headers/structs.h"
 
-void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out);
+void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out);
+void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *sol, fftw_plan plan, double *in, fftw_complex *out);
+
 
 void solver(System sys) {
     
     DSTN dst;
-    int i,j,my,mx;
+    int i,j,mx;
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nxy = sys.lat.Nxy;
     double _Complex *rhat = (double _Complex *) malloc(Nxy * sizeof(double _Complex));
     double _Complex *xhat = (double _Complex *) malloc(Nxy * sizeof(double _Complex));
@@ -13,31 +15,19 @@ void solver(System sys) {
     int N = 2*Nx + 2, NC = (N/2) + 1;
     dst.Nx = Nx; dst.N = N; dst.coef = sqrt(2.0/(Nx+1));
     
-#pragma omp parallel private (i,j,mx,my)
+#pragma omp parallel private (i,j,mx)
     {
             
         double *in        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
         fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
 
-        double _Complex *b    = (double _Complex *) malloc(Nx * sizeof(double _Complex));
-        double _Complex *bhat = (double _Complex *) malloc(Nx * sizeof(double _Complex));
         double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
         fftw_plan plan; /********************* FFTW *********************/
             
     #pragma omp critical (make_plan)
         { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
 
-    #pragma omp for
-        for(j = 0; j < Ny; j++) {
-            my = j*Nx;
-            for(i = 0; i < Nx; i++){
-                b[i] = sys.rhs[i + my];
-            }
-            DST(dst, b, bhat, plan, in, out); /********************* FFTW contained inside *********************/
-            for(i = 0; i < Nx; i++){
-                rhat[i + my] = bhat[i];
-            }
-        }
+        forwardDST(sys, dst, sys.rhs, rhat, plan, in, out);
         
     #pragma omp for
         for(i = 0; i < Nx; i++){
@@ -52,23 +42,11 @@ void solver(System sys) {
             }
         }
       
-    #pragma omp for
-        for(j = 0; j < Ny; j++) {
-            my = j*Nx;
-            for(i = 0; i < Nx; i++){
-                b[i] = xhat[j + i*Ny];
-            }
-            DST(dst, b, bhat, plan, in, out); /********************* FFTW contained inside *********************/
-            for(i = 0; i < Nx; i++){
-                sys.sol[i + my] = bhat[i];
-            }
-        }
+        reverseDST(sys, dst, xhat, sys.sol, plan, in, out);
             
         fftw_destroy_plan(plan); /********************* FFTW *********************/
         free(in); in = NULL;
         fftw_free(out); out = NULL; /********************* FFTW *********************/
-        free(b); b = NULL;
-        free(bhat); bhat = NULL;
         free(y); y = NULL;
     }
 
