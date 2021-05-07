@@ -69,11 +69,9 @@ void solver(System sys) {
     int ostride = 1; /* distance between two elements in the same column */
     int *inembed = NULL;
     int *onembed = NULL;
-#endif
-
-    // fftw_plan plan3 = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_ESTIMATE);
-    // fftw_plan plan4 = fftw_plan_many_dft_r2c(rank, n, howmany, in2, inembed, istride, idist, out2, onembed, ostride, odist, FFTW_ESTIMATE);
     /**********************BATCHED***************************/
+#endif
+    
     fftw_plan plan, plan2; /********************* FFTW *********************/
     double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
     
@@ -82,7 +80,7 @@ void solver(System sys) {
 #if USE_OMP   
     #pragma omp critical (make_plan)
 #endif
-
+    {
 #if USE_BATCHED
     plan = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_ESTIMATE);
     plan2 = fftw_plan_many_dft_r2c(rank, n, howmany, in2, inembed, istride, idist, out2, onembed, ostride, odist, FFTW_ESTIMATE);
@@ -90,12 +88,12 @@ void solver(System sys) {
     plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); /********************* FFTW *********************/
     plan2 = fftw_plan_dft_r2c_1d ( N, in2, out2, FFTW_ESTIMATE ); /********************* FFTW *********************/
 #endif
+    }
     POP_RANGE
 
     PUSH_RANGE("forwardDST", 2)
     forwardDST(sys, dst, sys.rhs, rhat, plan, in, out, plan2, in2, out2);
     POP_RANGE
-
         
     PUSH_RANGE("Middle stuff", 3)
 #if USE_OMP
