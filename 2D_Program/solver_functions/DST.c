@@ -27,36 +27,55 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 //                        NVTX                         
 //*****************************************************
 
-void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out) {
+// void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out) {
+void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rhat, fftw_plan plan, double *in, fftw_complex *out) {
  
-    int i;
-
-    PUSH_RANGE("reset in", 5)
-    for (i=0; i<dst.N; i++) { in[i] = 0.0; }
-    POP_RANGE
-
-    PUSH_RANGE("creal(b[i])", 6)
-    for (i=0; i<dst.Nx; i++) { in[i+1] = creal(b[i]); }
-    POP_RANGE
-
-    PUSH_RANGE("1st fffw_execute", 7)
-    fftw_execute(plan); /********************* FFTW *********************/
-    POP_RANGE
+    int i,j,my;
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     
-    PUSH_RANGE("-cimag(out[i+1])", 8)
-    for (i=0; i<dst.Nx; i++) { bhat[i] = -cimag(out[i+1]); }
-    POP_RANGE
-    
-    PUSH_RANGE("cimag(b[i])", 9)
-    for (i=0; i<dst.Nx; i++) { in[i+1] = cimag(b[i]); }
-    POP_RANGE
+#pragma omp for
+    for(j = 0; j < Ny; j++) {
+        my = j*Nx;
+        
+        for (i=0; i<dst.N; i++) { in[i] = 0.0; }
 
-    PUSH_RANGE("2nd fffw_execute", 10)
-    fftw_execute(plan); /********************* FFTW *********************/
-    POP_RANGE
+        for (i=0; i<dst.Nx; i++) { in[i+1] = creal(rhs[i + my]); }
+        
+        fftw_execute(plan); /********************* FFTW *********************/
+        
+        for (i=0; i<dst.Nx; i++) { rhat[i + my] = -cimag(out[i+1]); }
 
-    PUSH_RANGE("bhat[i]", 11)
-    for (i=0; i<dst.Nx; i++) { bhat[i] = dst.coef * (bhat[i] - I * cimag(out[i+1])); }
-    POP_RANGE
+        for (i=0; i<dst.Nx; i++) { in[i+1] = cimag(rhs[i + my]); }
+
+        fftw_execute(plan); /********************* FFTW *********************/
+
+        for (i=0; i<dst.Nx; i++) { rhat[i + my] = dst.coef * (rhat[i + my] - I * cimag(out[i+1])); }
+        
+    }
+}
+
+void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *sol, fftw_plan plan, double *in, fftw_complex *out) {
+ 
+    int i,j,my;
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     
+#pragma omp for
+    for(j = 0; j < Ny; j++) {
+        my = j*Nx;
+        
+        for (i=0; i<dst.N; i++) { in[i] = 0.0; }
+
+        for (i=0; i<dst.Nx; i++) { in[i+1] = creal(xhat[j + i*Ny]); }
+        
+        fftw_execute(plan); /********************* FFTW *********************/
+        
+        for (i=0; i<dst.Nx; i++) { sol[i + my] = -cimag(out[i+1]); }
+
+        for (i=0; i<dst.Nx; i++) { in[i+1] = cimag(xhat[j + i*Ny]); }
+
+        fftw_execute(plan); /********************* FFTW *********************/
+
+        for (i=0; i<dst.Nx; i++) { sol[i + my] = dst.coef * (sol[i + my] - I * cimag(out[i+1])); }
+        
+    }
 }

@@ -55,13 +55,16 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 //*******************************************************
 
 void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out);
+void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out);
+void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *sol, fftw_plan plan, double *in, fftw_complex *out);
+
 
 void solver(System sys) {
 
     PUSH_RANGE("solver", 0)
     
     DSTN dst;
-    int i,j,my,mx;
+    int i,j,mx;
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nxy = sys.lat.Nxy;
     double _Complex *rhat = (double _Complex *) malloc(Nxy * sizeof(double _Complex));
     double _Complex *xhat = (double _Complex *) malloc(Nxy * sizeof(double _Complex));
@@ -72,7 +75,7 @@ void solver(System sys) {
     printf("Nx = %d: Ny = %d: Nxy = %d: N = %d: NC = %d\n", Nx, Ny, Nxy, N, NC);
     
 #if USE_OMP
-#pragma omp parallel private (i,j,mx,my)
+#pragma omp parallel private (i,j,mx)
     {
 #endif
             
@@ -84,11 +87,9 @@ void solver(System sys) {
 #else
         double *in        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
         fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
-#endif
-        double _Complex *b    = (double _Complex *) malloc(Nx * sizeof(double _Complex));
-        double _Complex *bhat = (double _Complex *) malloc(Nx * sizeof(double _Complex));
         double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
         fftw_plan plan; /********************* FFTW *********************/
+#endif
 
     PUSH_RANGE("1st fffw_plan", 1)     
 #if USE_OMP   
@@ -97,23 +98,12 @@ void solver(System sys) {
         { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
     POP_RANGE
 
-    PUSH_RANGE("1st DST", 1)
-#if USE_OMP
-    #pragma omp for  
-#endif  
-        for(j = 0; j < Ny; j++) {
-            my = j*Nx;
-            for(i = 0; i < Nx; i++){
-                b[i] = sys.rhs[i + my];
-            }
-            DST(dst, b, bhat, plan, in, out); /********************* FFTW contained inside *********************/
-            for(i = 0; i < Nx; i++){
-                rhat[i + my] = bhat[i];
-            }
-        }
-    POP_RANGE
-        
     PUSH_RANGE("Middle stuff", 2)
+    forwardDST(sys, dst, sys.rhs, rhat, plan, in, out);
+    POP_RANGE
+
+        
+    PUSH_RANGE("Middle stuff", 3)
 #if USE_OMP
     #pragma omp for
 #endif
@@ -130,40 +120,25 @@ void solver(System sys) {
         }
     POP_RANGE
       
-    PUSH_RANGE("2nd DST", 3)
-#if USE_OMP
-    #pragma omp for
-#endif
-        for(j = 0; j < Ny; j++) {
-            my = j*Nx;
-            for(i = 0; i < Nx; i++){
-                b[i] = xhat[j + i*Ny];
-            }
-            DST(dst, b, bhat, plan, in, out); /********************* FFTW contained inside *********************/
-            for(i = 0; i < Nx; i++){
-                sys.sol[i + my] = bhat[i];
-            }
-        }
+    PUSH_RANGE("Middle stuff", 4)
+    reverseDST(sys, dst, xhat, sys.sol, plan, in, out);
     POP_RANGE
-        
-        PUSH_RANGE("Cleanup", 4)
-#if USE_CUFFTW
-        cudaFreeHost(&in);
-        cudaFreeHost(&out);
-#else
-        free(in); in = NULL;
-        fftw_free(out); out = NULL; /********************* FFTW *********************/
-#endif
-
-        fftw_destroy_plan(plan); /********************* FFTW *********************/
-
-        free(b); b = NULL;
-        free(bhat); bhat = NULL;
-        free(y); y = NULL;
+                    
 #if USE_OMP
     }
 #endif
 
+    PUSH_RANGE("Cleanup", 5)
+#if USE_CUFFTW
+    cudaFreeHost(&in);
+    cudaFreeHost(&out);
+#else
+    free(in); in = NULL;
+    fftw_free(out); out = NULL; /********************* FFTW *********************/
+#endif
+
+    fftw_destroy_plan(plan); /********************* FFTW *********************/
+    free(y); y = NULL;
     free(rhat); rhat = NULL;
     free(xhat); xhat = NULL;
     POP_RANGE
