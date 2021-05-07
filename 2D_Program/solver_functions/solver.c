@@ -30,35 +30,66 @@ void solver(System sys) {
 #pragma omp parallel private (i,j,mx)
     {
 #endif
+
+#if USE_BATCHED
+    size_t size_in = sizeof(double) * N * Ny;
+    size_t size_out = sizeof(fftw_complex) * NC * Ny;
+#else 
+    size_t size_in = sizeof(double) * N;
+    size_t size_out = sizeof(fftw_complex) * NC;
+#endif
             
 #if USE_CUFFTW
         double *in, *in2;
         fftw_complex *out, *out2;
-        CUDA_RT_CALL(cudaMallocHost((void**)&in, sizeof(double) * N));
-        CUDA_RT_CALL(cudaMallocHost((void**)&in2, sizeof(double) * N));
-        CUDA_RT_CALL(cudaMallocHost((void**)&out, sizeof(fftw_complex) * NC));
-        CUDA_RT_CALL(cudaMallocHost((void**)&out2, sizeof(fftw_complex) * NC));
+        CUDA_RT_CALL(cudaMallocHost((void**)&in, size_in));
+        CUDA_RT_CALL(cudaMallocHost((void**)&in2, size_in));
+        CUDA_RT_CALL(cudaMallocHost((void**)&out, size_out));
+        CUDA_RT_CALL(cudaMallocHost((void**)&out2, size_out));
 #else
-        double *in        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
-        double *in2        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
-        fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
-        fftw_complex *out2 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
+        double *in        = (double *) fftw_malloc(size_in); /********************* FFTW *********************/
+        double *in2        = (double *) fftw_malloc(size_in); /********************* FFTW *********************/
+        fftw_complex *out = (fftw_complex*) fftw_malloc(size_out); /********************* FFTW *********************/
+        fftw_complex *out2 = (fftw_complex*) fftw_malloc(size_out); /********************* FFTW *********************/
 #endif
 
-    memset(in, 0, sizeof(double) * N);
-    memset(in2, 0, sizeof(double) * N);
-    memset(out, 0, sizeof(fftw_complex) * NC);
-    memset(out2, 0, sizeof(fftw_complex) * NC);
+    memset(in, 0, size_in);
+    memset(in2, 0, size_in);
+    memset(out, 0, size_out);
+    memset(out2, 0, size_out);
 
-    double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
+#if USE_BATCHED
+    /**********************BATCHED***************************/
+    int rank = 1; /* not 2: we are computing 1d transforms */
+    int n[] = {N};
+    int howmany = Ny;
+    int idist = N;
+    int odist = NC;
+    int istride = 1;
+    int ostride = 1; /* distance between two elements in the same column */
+    int *inembed = NULL;
+    int *onembed = NULL;
+#endif
+
+    // fftw_plan plan3 = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_ESTIMATE);
+    // fftw_plan plan4 = fftw_plan_many_dft_r2c(rank, n, howmany, in2, inembed, istride, idist, out2, onembed, ostride, odist, FFTW_ESTIMATE);
+    /**********************BATCHED***************************/
     fftw_plan plan, plan2; /********************* FFTW *********************/
+    double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
+    
 
     PUSH_RANGE("1st fffw_plan", 1)     
 #if USE_OMP   
     #pragma omp critical (make_plan)
 #endif
+
+#if USE_BATCHED
+    plan = fftw_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_ESTIMATE);
+    plan2 = fftw_plan_many_dft_r2c(rank, n, howmany, in2, inembed, istride, idist, out2, onembed, ostride, odist, FFTW_ESTIMATE);
+#else
     plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); /********************* FFTW *********************/
     plan2 = fftw_plan_dft_r2c_1d ( N, in2, out2, FFTW_ESTIMATE ); /********************* FFTW *********************/
+#endif
     POP_RANGE
 
     PUSH_RANGE("forwardDST", 2)
@@ -101,6 +132,7 @@ void solver(System sys) {
 #endif
 
     fftw_destroy_plan(plan); /********************* FFTW *********************/
+    fftw_destroy_plan(plan2); /********************* FFTW *********************/
     free(y); y = NULL;
 
 #if USE_OMP

@@ -25,6 +25,12 @@ ifneq ($(origin USE_OMP), undefined)
 	endif
 endif
 
+ifneq ($(origin USE_BATCHED), undefined)
+	ifneq ($(USE_BATCHED), 0)
+		CFLAGS += -DUSE_BATCHED
+	endif
+endif
+
 .PHONY: depend clean
 
 all: $(MAIN)
