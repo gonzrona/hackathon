@@ -87,15 +87,15 @@ void solver(System sys) {
 #else
         double *in        = (double *) fftw_malloc(sizeof(double) * N); /********************* FFTW *********************/
         fftw_complex *out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC); /********************* FFTW *********************/
-        double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
-        fftw_plan plan; /********************* FFTW *********************/
 #endif
+    double _Complex *y    = (double _Complex *) malloc(Ny * sizeof(double _Complex));
+    fftw_plan plan; /********************* FFTW *********************/
 
     PUSH_RANGE("1st fffw_plan", 1)     
 #if USE_OMP   
     #pragma omp critical (make_plan)
 #endif
-        { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
+    { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
     POP_RANGE
 
     PUSH_RANGE("Middle stuff", 2)
