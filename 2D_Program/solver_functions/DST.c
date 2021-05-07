@@ -19,8 +19,13 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
         for (i=0; i<dst.Nx; i++) { in2[(j*N) + i+1] = cimag(rhs[i + my]); }       
     }
 
+#if USE_OMP   
+    #pragma omp critical (fftw_execute)
+#endif
+    {
     fftw_execute(plan); /********************* FFTW *********************/
     fftw_execute(plan2); /********************* FFTW *********************/
+    }
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
@@ -63,8 +68,13 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *so
         for (i=0; i<dst.Nx; i++) { in2[(j*N) + i+1] = cimag(xhat[j + i*Ny]); }
     }
 
-        fftw_execute(plan); /********************* FFTW *********************/
-        fftw_execute(plan2); /********************* FFTW *********************/
+#if USE_OMP   
+    #pragma omp critical (fftw_execute)
+#endif
+    {
+    fftw_execute(plan); /********************* FFTW *********************/
+    fftw_execute(plan2); /********************* FFTW *********************/
+    }
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
