@@ -95,10 +95,10 @@ void solver(System sys) {
 #if USE_OMP   
     #pragma omp critical (make_plan)
 #endif
-    { plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); } /********************* FFTW *********************/
+    plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); /********************* FFTW *********************/
     POP_RANGE
 
-    PUSH_RANGE("Middle stuff", 2)
+    PUSH_RANGE("forwardDST", 2)
     forwardDST(sys, dst, sys.rhs, rhat, plan, in, out);
     POP_RANGE
 
@@ -120,18 +120,14 @@ void solver(System sys) {
         }
     POP_RANGE
       
-    PUSH_RANGE("Middle stuff", 4)
+    PUSH_RANGE("reverseDST", 4)
     reverseDST(sys, dst, xhat, sys.sol, plan, in, out);
     POP_RANGE
-                    
-#if USE_OMP
-    }
-#endif
 
     PUSH_RANGE("Cleanup", 5)
 #if USE_CUFFTW
-    cudaFreeHost(&in);
-    cudaFreeHost(&out);
+    CUDA_RT_CALL(cudaFreeHost(&in));
+    CUDA_RT_CALL(cudaFreeHost(&out));
 #else
     free(in); in = NULL;
     fftw_free(out); out = NULL; /********************* FFTW *********************/
@@ -139,6 +135,11 @@ void solver(System sys) {
 
     fftw_destroy_plan(plan); /********************* FFTW *********************/
     free(y); y = NULL;
+
+#if USE_OMP
+    }
+#endif    
+
     free(rhat); rhat = NULL;
     free(xhat); xhat = NULL;
     POP_RANGE
