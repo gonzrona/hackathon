@@ -126,8 +126,8 @@ void solver(System sys) {
 
     PUSH_RANGE("Cleanup", 5)
 #if USE_CUFFTW
-    CUDA_RT_CALL(cudaFreeHost(&in));
-    CUDA_RT_CALL(cudaFreeHost(&out));
+    CUDA_RT_CALL(cudaFreeHost(in));
+    CUDA_RT_CALL(cudaFreeHost(out));
 #else
     free(in); in = NULL;
     fftw_free(out); out = NULL; /********************* FFTW *********************/
