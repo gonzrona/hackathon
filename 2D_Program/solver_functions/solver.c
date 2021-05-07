@@ -57,8 +57,10 @@ void solver(System sys) {
 #if USE_OMP   
     #pragma omp critical (make_plan)
 #endif
+    {
     plan = fftw_plan_dft_r2c_1d ( N, in, out, FFTW_ESTIMATE ); /********************* FFTW *********************/
     plan2 = fftw_plan_dft_r2c_1d ( N, in2, out2, FFTW_ESTIMATE ); /********************* FFTW *********************/
+    }
     POP_RANGE
 
     PUSH_RANGE("forwardDST", 2)
