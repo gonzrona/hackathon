@@ -10,10 +10,16 @@
 #define ind_e(i,j,Nx) i+1+(j+1)*(Nx+2)
 
 enum Order{second, fourth, sixth};
+enum Direction{forward, reverse};
 
 typedef struct {
-    int Nx, N;
+    int Nx, Ny, N, NC;
     double coef;
+    
+    double *in1, *in2;
+    fftw_complex *out1, *out2;
+    fftw_plan plan1, plan2;
+    
 } DSTN;
 
 typedef struct {

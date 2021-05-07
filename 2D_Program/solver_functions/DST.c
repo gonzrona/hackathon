@@ -1,53 +1,46 @@
 #include "../headers/structs.h"
 
-void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rhat, fftw_plan plan, double *in, fftw_complex *out) {
+
+void DST(enum Direction dir, System sys, DSTN dst, double _Complex *x, double _Complex *xhat) {
  
-    int i,j,my;
-    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
+    int i,j;
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny, N = dst.N;
+    int NC = dst.NC;
     
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
-        
-        for (i=0; i<dst.N; i++) { in[i] = 0.0; }
+    double *in1 = dst.in1, *in2 = dst.in2;
+    fftw_complex *out1 = dst.out1, *out2 = dst.out2;
+    fftw_plan plan1 = dst.plan1, plan2 = dst.plan2;
 
-        for (i=0; i<dst.Nx; i++) { in[i+1] = creal(rhs[i + my]); }
-        
-        fftw_execute(plan); /********************* FFTW *********************/
-        
-        for (i=0; i<dst.Nx; i++) { rhat[i + my] = -cimag(out[i+1]); }
-
-        for (i=0; i<dst.Nx; i++) { in[i+1] = cimag(rhs[i + my]); }
-
-        fftw_execute(plan); /********************* FFTW *********************/
-
-        for (i=0; i<dst.Nx; i++) { rhat[i + my] = dst.coef * (rhat[i + my] - I * cimag(out[i+1])); }
-        
+    for(i=0; i<N*Ny; i++) {
+        in1[i] = 0.;
+        in2[i] = 0.;
     }
-}
-
-void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *sol, fftw_plan plan, double *in, fftw_complex *out) {
- 
-    int i,j,my;
-    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
-        
-        for (i=0; i<dst.N; i++) { in[i] = 0.0; }
+    if (dir == forward) {
+        for (j=0; j<Ny; j++) {
+            for (i=0; i<Nx; i++) {
+                in1[ind(i+1,j,N)] = creal(x[ind(i,j,Nx)]);
+                in2[ind(i+1,j,N)] = cimag(x[ind(i,j,Nx)]);
+            }
+        }
+    }
+    else {
+        for (j=0; j<Ny; j++) {
+            for (i=0; i<Nx; i++) {
+                in1[ind(i+1,j,N)] = creal(x[ind(j,i,Ny)]);
+                in2[ind(i+1,j,N)] = cimag(x[ind(j,i,Ny)]);
+            }
+        }
+    }
 
-        for (i=0; i<dst.Nx; i++) { in[i+1] = creal(xhat[j + i*Ny]); }
-        
-        fftw_execute(plan); /********************* FFTW *********************/
-        
-        for (i=0; i<dst.Nx; i++) { sol[i + my] = -cimag(out[i+1]); }
 
-        for (i=0; i<dst.Nx; i++) { in[i+1] = cimag(xhat[j + i*Ny]); }
-
-        fftw_execute(plan); /********************* FFTW *********************/
-
-        for (i=0; i<dst.Nx; i++) { sol[i + my] = dst.coef * (sol[i + my] - I * cimag(out[i+1])); }
-        
+    fftw_execute(plan1);
+    fftw_execute(plan2);
+    
+    
+    for (i=0; i<Nx; i++) {
+        for (j=0; j<Ny; j++) {
+            xhat[ind(i,j,Nx)] = -dst.coef * (cimag(out1[ind(i+1,j,NC)]) + I * cimag(out2[ind(i+1,j,NC)]));
+        }
     }
 }
