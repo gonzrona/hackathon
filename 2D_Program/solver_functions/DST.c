@@ -18,8 +18,10 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
     size_t size_in = sizeof(double) * N * Ny;
     size_t size_out = sizeof(fftw_complex) * NC * Ny;
 
-    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
@@ -29,6 +31,9 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
         for (i=0; i<dst.Nx; i++) { in2[(j*N) + i+1] = cimag(rhs[i + my]); }       
     }
 
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
+
 #if USE_OMP   
     #pragma omp critical (fftw_execute)
 #endif
@@ -37,8 +42,8 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
     fftw_execute(plan2); /********************* FFTW *********************/
     }
 
-    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, cudaCpuDeviceId, NULL));
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
@@ -77,8 +82,10 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *so
     size_t size_in = sizeof(double) * N * Ny;
     size_t size_out = sizeof(fftw_complex) * NC * Ny;
 
-    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
@@ -88,6 +95,9 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *so
         for (i=0; i<dst.Nx; i++) { in2[(j*N) + i+1] = cimag(xhat[j + i*Ny]); }
     }
 
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
+
 #if USE_OMP   
     #pragma omp critical (fftw_execute)
 #endif
@@ -96,8 +106,8 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *so
     fftw_execute(plan2); /********************* FFTW *********************/
     }
 
-    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, cudaCpuDeviceId, NULL));
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {

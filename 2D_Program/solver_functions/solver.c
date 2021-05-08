@@ -38,11 +38,6 @@ void solver(System sys) {
     CUDA_RT_CALL(cudaMallocManaged((void**)&out, size_out, 1));
     CUDA_RT_CALL(cudaMallocManaged((void**)&out2, size_out, 1));
 
-    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, cudaCpuDeviceId, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, cudaCpuDeviceId, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, cudaCpuDeviceId, NULL));
-    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, cudaCpuDeviceId, NULL));
-
 #else
     double *in        = (double *) fftw_malloc(size_in); /********************* FFTW *********************/
     double *in2        = (double *) fftw_malloc(size_in); /********************* FFTW *********************/
