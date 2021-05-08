@@ -24,7 +24,7 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
     CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
     CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
-    load_wrapper(sys, dst, rhs, in, in2);
+    load_1st_DST_wrapper(sys, dst, rhs, in, in2);
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
