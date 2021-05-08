@@ -1,6 +1,6 @@
 NVCC = nvcc
 CC = gcc
-CFLAGS = -Xcompiler -Wall -Xcompiler -fopenmp -O2
+CFLAGS = -Xcompiler -Wall -Xcompiler -fopenmp -O2 --expt-relaxed-constexpr
 INCLUDES = -I/usr/local/include -I/usr/local/cuda/include
 LFLAGS = -L/usr/local/lib -L/usr/local/cuda/lib64 
 LIBS = -lm -lnvToolsExt -lcudart
@@ -48,10 +48,10 @@ $(MAIN): $(OBJS) $(CUOBJS)
 	$(NVCC) -ccbin $(CC) $(CFLAGS) $(INCLUDES) -o ${MAIN} ${OBJS} ${CUOBJS} $(LFLAGS) $(LIBS)
 
 %.o: %.c
-	$(NVCC) -ccbin $(CC) $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
+	$(NVCC) -t 0 -ccbin $(CC) $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
 
 %.o: %.cu
-	$(NVCC) -ccbin $(CC) $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
+	$(NVCC) -t 0 -ccbin $(CC) -std=c++11 $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
 
 clean:
 	$(RM) *.o *~ $(MAIN) */*.o

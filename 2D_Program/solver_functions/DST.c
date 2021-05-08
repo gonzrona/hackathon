@@ -26,6 +26,10 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
 
     load_1st_DST_wrapper(sys, dst, rhs, in, in2);
 
+    for (int i = 0; i < 10; i++)
+        printf("%f : %f\n", creal(rhs[i]), cimag(rhs[i]));
+    printf("\n");
+
 #pragma omp for
     for(j = 0; j < Ny; j++) {
         my = j*Nx;
