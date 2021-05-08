@@ -10,6 +10,8 @@ void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, do
 void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out, fftw_plan plan2, double *in2, fftw_complex *out2);
 void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *sol, fftw_plan plan, double *in, fftw_complex *out, fftw_plan plan2, double *in2, fftw_complex *out2);
 
+#define USE_BATCHED 1
+#define USE_CUFFTW 1
 
 #if USE_BATCHED
 void solver(System sys) {
@@ -31,10 +33,16 @@ void solver(System sys) {
 #if USE_CUFFTW
     double *in, *in2;
     fftw_complex *out, *out2;
-    CUDA_RT_CALL(cudaMallocHost((void**)&in, size_in));
-    CUDA_RT_CALL(cudaMallocHost((void**)&in2, size_in));
-    CUDA_RT_CALL(cudaMallocHost((void**)&out, size_out));
-    CUDA_RT_CALL(cudaMallocHost((void**)&out2, size_out));
+    CUDA_RT_CALL(cudaMallocManaged((void**)&in, size_in, 1));
+    CUDA_RT_CALL(cudaMallocManaged((void**)&in2,size_in, 1));
+    CUDA_RT_CALL(cudaMallocManaged((void**)&out, size_out, 1));
+    CUDA_RT_CALL(cudaMallocManaged((void**)&out2, size_out, 1));
+
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, cudaCpuDeviceId, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, cudaCpuDeviceId, NULL));
+
 #else
     double *in        = (double *) fftw_malloc(size_in); /********************* FFTW *********************/
     double *in2        = (double *) fftw_malloc(size_in); /********************* FFTW *********************/
@@ -107,10 +115,10 @@ void solver(System sys) {
 #endif    
 
 #if USE_CUFFTW
-    CUDA_RT_CALL(cudaFreeHost(in));
-    CUDA_RT_CALL(cudaFreeHost(out));
-    CUDA_RT_CALL(cudaFreeHost(in2));
-    CUDA_RT_CALL(cudaFreeHost(out2));
+    CUDA_RT_CALL(cudaFree(in));
+    CUDA_RT_CALL(cudaFree(out));
+    CUDA_RT_CALL(cudaFree(in2));
+    CUDA_RT_CALL(cudaFree(out2));
 #else
     free(in); in = NULL;
     fftw_free(out); out = NULL; /********************* FFTW *********************/

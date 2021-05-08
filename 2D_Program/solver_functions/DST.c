@@ -3,6 +3,9 @@
 #include <cufftw.h>
 #include "cuda_helper.h"
 
+#define USE_BATCHED 1
+#define USE_CUFFTW 1
+
 void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rhat, fftw_plan plan, double *in, fftw_complex *out, fftw_plan plan2, double *in2, fftw_complex *out2) {
  
     int i,j,my;
@@ -11,6 +14,13 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
 #if USE_BATCHED
 
     int N = 2*Nx + 2, NC = (N/2) + 1;
+
+    size_t size_in = sizeof(double) * N * Ny;
+    size_t size_out = sizeof(fftw_complex) * NC * Ny;
+
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
+
 #pragma omp for
     for(j = 0; j < Ny; j++) {
         my = j*Nx;
@@ -26,6 +36,9 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
     fftw_execute(plan); /********************* FFTW *********************/
     fftw_execute(plan2); /********************* FFTW *********************/
     }
+
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
@@ -60,6 +73,13 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *so
 #if USE_BATCHED    
 
     int N = 2*Nx + 2, NC = (N/2) + 1;
+
+    size_t size_in = sizeof(double) * N * Ny;
+    size_t size_out = sizeof(fftw_complex) * NC * Ny;
+
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
+
 #pragma omp for
     for(j = 0; j < Ny; j++) {
         my = j*Nx;
@@ -75,6 +95,9 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *so
     fftw_execute(plan); /********************* FFTW *********************/
     fftw_execute(plan2); /********************* FFTW *********************/
     }
+
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
+    CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
 #pragma omp for
     for(j = 0; j < Ny; j++) {
