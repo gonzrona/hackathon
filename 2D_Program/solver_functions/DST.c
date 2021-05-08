@@ -24,6 +24,8 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
     CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
     CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
+    load_wrapper(sys, dst, rhs, in, in2);
+
 #pragma omp for
     for(j = 0; j < Ny; j++) {
         my = j*Nx;
@@ -52,8 +54,6 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
 
         for (i=0; i<dst.Nx; i++) { rhat[i + my] = dst.coef * (-cimag(out[(j*NC) + i+1]) - I * cimag(out2[(j*NC) + i+1])); }
     }
-
-    print_wrapper();
 
 #else
 
