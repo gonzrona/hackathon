@@ -2,6 +2,7 @@
 
 #include <cufftw.h>
 #include "cuda_helper.h"
+#include "cuda_kernels.h"
 
 #define USE_BATCHED 1
 #define USE_CUFFTW 1
@@ -51,6 +52,8 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rha
 
         for (i=0; i<dst.Nx; i++) { rhat[i + my] = dst.coef * (-cimag(out[(j*NC) + i+1]) - I * cimag(out2[(j*NC) + i+1])); }
     }
+
+    print_wrapper();
 
 #else
 
