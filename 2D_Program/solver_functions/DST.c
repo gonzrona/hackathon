@@ -13,7 +13,6 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs,
                 fftw_complex *out, fftw_plan plan2, double *in2,
                 fftw_complex *out2) {
 
-  int i, j, my;
   int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
 
 #if USE_BATCHED
@@ -82,7 +81,6 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat,
                 fftw_complex *out, fftw_plan plan2, double *in2,
                 fftw_complex *out2) {
 
-  int i, j, my;
   int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
 
 #if USE_BATCHED
