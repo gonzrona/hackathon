@@ -8,35 +8,12 @@
 #define USE_BATCHED 1
 #define USE_CUFFTW 1
 
-void forwardDST(System sys, DSTN dst, double _Complex *rhs,
-                double _Complex *rhat, fftw_plan plan, double *in,
+void forwardDST(System sys, DSTN dst, cuDoubleComplex *d_rhs,
+                cuDoubleComplex *d_rhat, fftw_plan plan, double *in,
                 fftw_complex *out, fftw_plan plan2, double *in2,
                 fftw_complex *out2) {
 
-  int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-
 #if USE_BATCHED
-
-  int N = 2 * Nx + 2, NC = (N / 2) + 1;
-
-  size_t size_in = sizeof(double) * N * Ny;
-  size_t size_out = sizeof(fftw_complex) * NC * Ny;
-
-  CUDA_RT_CALL(cudaMemPrefetchAsync(in, size_in, 0, NULL));
-  CUDA_RT_CALL(cudaMemPrefetchAsync(in2, size_in, 0, NULL));
-  CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
-  CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
-
-  cuDoubleComplex *d_rhs;
-  CUDA_RT_CALL(
-      cudaMalloc((void **)(&d_rhs), sys.lat.Nxy * sizeof(double _Complex)));
-  CUDA_RT_CALL(cudaMemcpy(d_rhs, rhs, sys.lat.Nxy * sizeof(double _Complex),
-                          cudaMemcpyHostToDevice));
-
-  cuDoubleComplex *d_rhat;
-  CUDA_RT_CALL(
-      cudaMalloc((void **)(&d_rhat), sys.lat.Nxy * sizeof(double _Complex)));
-
   load_1st_DST_wrapper(sys, dst, d_rhs, in, in2);
 
 #if USE_OMP
@@ -48,10 +25,6 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs,
   }
 
   store_1st_DST_wrapper(sys, dst, d_rhat, out, out2);
-
-  CUDA_RT_CALL(cudaMemcpy(rhat, d_rhat, sys.lat.Nxy * sizeof(double _Complex),
-                          cudaMemcpyDeviceToHost))
-
 #else
 
 #pragma omp for
@@ -76,29 +49,12 @@ void forwardDST(System sys, DSTN dst, double _Complex *rhs,
 #endif
 }
 
-void reverseDST(System sys, DSTN dst, double _Complex *xhat,
-                double _Complex *sol, fftw_plan plan, double *in,
+void reverseDST(System sys, DSTN dst, cuDoubleComplex *d_xhat,
+                cuDoubleComplex *d_sol, fftw_plan plan, double *in,
                 fftw_complex *out, fftw_plan plan2, double *in2,
                 fftw_complex *out2) {
 
-  int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-
 #if USE_BATCHED
-
-  int N = 2 * Nx + 2, NC = (N / 2) + 1;
-
-  size_t size_in = sizeof(double) * N * Ny;
-  size_t size_out = sizeof(fftw_complex) * NC * Ny;
-
-  cuDoubleComplex *d_xhat;
-  CUDA_RT_CALL(
-      cudaMalloc((void **)(&d_xhat), sys.lat.Nxy * sizeof(double _Complex)));
-  CUDA_RT_CALL(cudaMemcpy(d_xhat, xhat, sys.lat.Nxy * sizeof(double _Complex),
-                          cudaMemcpyHostToDevice));
-
-  cuDoubleComplex *d_sol;
-  CUDA_RT_CALL(cudaMalloc((void **)(&d_sol), sys.lat.Nxy * sizeof(double _Complex)));
-
   load_2st_DST_wrapper(sys, dst, d_xhat, in, in2);
 
 #if USE_OMP
@@ -110,10 +66,6 @@ void reverseDST(System sys, DSTN dst, double _Complex *xhat,
   }
 
   store_2st_DST_wrapper(sys, dst, d_sol, out, out2);
-
-  CUDA_RT_CALL(cudaMemcpy(sol, d_sol, sys.lat.Nxy * sizeof(double _Complex),
-                          cudaMemcpyDeviceToHost))
-
 #else
 
 #pragma omp for
