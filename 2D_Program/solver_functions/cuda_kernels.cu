@@ -42,8 +42,8 @@ void load_1st_DST_wrapper(System sys, DSTN dst, cuDoubleComplex *d_rhs,
   CUDA_RT_CALL(
       cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0));
 
-  dim3 threadPerBlock{1, 1};
-  dim3 blocksPerGrid{1, 1};
+  dim3 threadPerBlock {16, 16};
+  dim3 blocksPerGrid (numSMs, numSMs);
 
   void *args[]{&N, &Nx, &Ny, &d_rhs, &in, &in2};
 
