@@ -56,6 +56,11 @@ void solver(System sys) {
   CUDA_RT_CALL(cudaMemPrefetchAsync(out, size_out, 0, NULL));
   CUDA_RT_CALL(cudaMemPrefetchAsync(out2, size_out, 0, NULL));
 
+  CUDA_RT_CALL(cudaMemset(in, size_in, 0));
+  CUDA_RT_CALL(cudaMemset(in2, size_in, 0));
+  CUDA_RT_CALL(cudaMemset(out, size_out, 0));
+  CUDA_RT_CALL(cudaMemset(out2, size_out, 0));
+
 #else
   double *in = (double *)fftw_malloc(
       size_in); /********************* FFTW *********************/
@@ -84,11 +89,6 @@ void solver(System sys) {
   CUDA_RT_CALL(cudaMemcpy(d_rhs, sys.rhs, sys.lat.Nxy * sizeof(double _Complex),
                           cudaMemcpyHostToDevice));
 
-  memset(in, 0, size_in);
-  memset(in2, 0, size_in);
-  memset(out, 0, size_out);
-  memset(out2, 0, size_out);
-
   /**********************BATCHED***************************/
   int rank = 1; /* not 2: we are computing 1d transforms */
   int n[] = {N};
@@ -109,6 +109,7 @@ void solver(System sys) {
                                 out, onembed, ostride, odist, FFTW_ESTIMATE);
   plan2 = fftw_plan_many_dft_r2c(rank, n, howmany, in2, inembed, istride, idist,
                                  out2, onembed, ostride, odist, FFTW_ESTIMATE);
+  POP_RANGE
 
 #if USE_OMP
 #pragma omp parallel private(i, j, mx)

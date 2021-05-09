@@ -25,7 +25,6 @@ __global__ void load_1st_DST(const int N, const int Nx, const int Ny,
 
   for (int tidY = ty; tidY < Ny; tidY += strideY) {
     for (int tidX = tx; tidX < Nx; tidX += strideX) {
-
       in[tidY * N + tidX + 1] = rhs[tidX + tidY * Nx].x;
       in2[tidY * N + tidX + 1] = rhs[tidX + tidY * Nx].y;
     }
@@ -54,7 +53,6 @@ __global__ void store_1st_DST(const int N, const int Nx, const int Ny,
 
   for (int tidY = ty; tidY < Ny; tidY += strideY) {
     for (int tidX = tx; tidX < Nx; tidX += strideX) {
-
       d_rhat[Ny * tidY + tidX].x = coef * -out[tidY * NC + tidX + 1].y;
       d_rhat[Ny * tidY + tidX].y = coef * -out2[tidY * NC + tidX + 1].y;
     }
@@ -82,7 +80,6 @@ __global__ void load_2st_DST(const int N, const int Nx, const int Ny,
 
   for (int tidY = ty; tidY < Ny; tidY += strideY) {
     for (int tidX = tx; tidX < Nx; tidX += strideX) {
-
       in[tidY * N + tidX + 1] = xhat[tidY + tidX * Ny].x;
       in2[tidY * N + tidX + 1] = xhat[tidY + tidX * Ny].y;
     }
@@ -111,7 +108,6 @@ __global__ void store_2st_DST(const int N, const int Nx, const int Ny,
 
   for (int tidY = ty; tidY < Ny; tidY += strideY) {
     for (int tidX = tx; tidX < Nx; tidX += strideX) {
-
       d_sol[Ny * tidY + tidX].x = coef * -out[tidY * NC + tidX + 1].y;
       d_sol[Ny * tidY + tidX].y = coef * -out2[tidY * NC + tidX + 1].y;
     }
@@ -207,7 +203,7 @@ void store_2st_DST_wrapper(const System sys, const DSTN dst,
 
   void *args[]{&N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_sol};
 
-  CUDA_RT_CALL(cudaLaunchKernel((void *)(&store_1st_DST), blocksPerGrid,
+  CUDA_RT_CALL(cudaLaunchKernel((void *)(&store_2st_DST), blocksPerGrid,
                                 threadPerBlock, args, 0, NULL));
 
   CUDA_RT_CALL(cudaPeekAtLastError());
