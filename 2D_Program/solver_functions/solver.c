@@ -55,11 +55,13 @@ void solver(System sys) {
   CUDA_RT_CALL(cudaMallocManaged((void **)&out, size_out, 1));
   CUDA_RT_CALL(cudaMallocManaged((void **)&out2, size_out, 1));
 
-//   cuDoubleComplex *d_rhs;
-//   CUDA_RT_CALL(
-//       cudaMalloc((void **)(&d_rhs), sys.lat.Nxy * sizeof(double _Complex)));
-//   CUDA_RT_CALL(cudaMemcpy(d_rhs, sys.rhs, sys.lat.Nxy * sizeof(double _Complex),
-//                           cudaMemcpyHostToDevice));
+  //   cuDoubleComplex *d_rhs;
+  //   CUDA_RT_CALL(
+  //       cudaMalloc((void **)(&d_rhs), sys.lat.Nxy * sizeof(double
+  //       _Complex)));
+  //   CUDA_RT_CALL(cudaMemcpy(d_rhs, sys.rhs, sys.lat.Nxy * sizeof(double
+  //   _Complex),
+  //                           cudaMemcpyHostToDevice));
 
 #else
   double *in = (double *)fftw_malloc(
@@ -107,7 +109,7 @@ void solver(System sys) {
         (double _Complex *)malloc(Ny * sizeof(double _Complex));
 
     PUSH_RANGE("forwardDST", 2)
-  forwardDST(sys, dst, sys.rhs, rhat, plan, in, out, plan2, in2, out2);
+    forwardDST(sys, dst, sys.rhs, rhat, plan, in, out, plan2, in2, out2);
     POP_RANGE
 
     PUSH_RANGE("Middle stuff", 3)
