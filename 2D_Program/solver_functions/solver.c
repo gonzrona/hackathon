@@ -30,10 +30,13 @@ void solver(System sys) {
   DSTN dst;
   int i, j, mx;
   int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nxy = sys.lat.Nxy;
-  double _Complex *rhat =
-      (double _Complex *)malloc(Nxy * sizeof(double _Complex));
-  double _Complex *xhat =
-      (double _Complex *)malloc(Nxy * sizeof(double _Complex));
+
+  double _Complex *rhat;
+  double _Complex *xhat;
+  CUDA_RT_CALL(
+      cudaMallocHost((void **)(&rhat), sys.lat.Nxy * sizeof(double _Complex)));
+  CUDA_RT_CALL(
+      cudaMallocHost((void **)(&xhat), sys.lat.Nxy * sizeof(double _Complex)));
 
   int N = 2 * Nx + 2, NC = (N / 2) + 1;
   dst.Nx = Nx;
@@ -72,22 +75,18 @@ void solver(System sys) {
       size_out); /********************* FFTW *********************/
 #endif
 
-  cuDoubleComplex *d_rhs;
   cuDoubleComplex *d_rhat;
   cuDoubleComplex *d_xhat;
-  cuDoubleComplex *d_sol;
 
-  CUDA_RT_CALL(
-      cudaMalloc((void **)(&d_rhs), sys.lat.Nxy * sizeof(double _Complex)));
   CUDA_RT_CALL(
       cudaMalloc((void **)(&d_rhat), sys.lat.Nxy * sizeof(double _Complex)));
   CUDA_RT_CALL(
       cudaMalloc((void **)(&d_xhat), sys.lat.Nxy * sizeof(double _Complex)));
-  CUDA_RT_CALL(
-      cudaMalloc((void **)(&d_sol), sys.lat.Nxy * sizeof(double _Complex)));
 
-  CUDA_RT_CALL(cudaMemcpy(d_rhs, sys.rhs, sys.lat.Nxy * sizeof(double _Complex),
-                          cudaMemcpyHostToDevice));
+  CUDA_RT_CALL(cudaMemPrefetchAsync(
+      sys.rhs, sys.lat.Nxy * sizeof(double _Complex), 0, NULL));
+  CUDA_RT_CALL(cudaMemPrefetchAsync(
+      sys.sol, sys.lat.Nxy * sizeof(double _Complex), 0, NULL));
 
   /**********************BATCHED***************************/
   int rank = 1; /* not 2: we are computing 1d transforms */
@@ -120,7 +119,7 @@ void solver(System sys) {
         (double _Complex *)malloc(Ny * sizeof(double _Complex));
 
     PUSH_RANGE("forwardDST", 2)
-    forwardDST(sys, dst, d_rhs, d_rhat, plan, in, out, plan2, in2, out2);
+    forwardDST(sys, dst, sys.rhs, d_rhat, plan, in, out, plan2, in2, out2);
     CUDA_RT_CALL(cudaMemcpy(rhat, d_rhat, sys.lat.Nxy * sizeof(double _Complex),
                             cudaMemcpyDeviceToHost))
     POP_RANGE
@@ -146,10 +145,10 @@ void solver(System sys) {
     PUSH_RANGE("reverseDST", 4)
     CUDA_RT_CALL(cudaMemcpy(d_xhat, xhat, sys.lat.Nxy * sizeof(double _Complex),
                             cudaMemcpyHostToDevice));
-    reverseDST(sys, dst, d_xhat, d_sol, plan, in, out, plan2, in2, out2);
-    CUDA_RT_CALL(cudaMemcpy(sys.sol, d_sol,
-                            sys.lat.Nxy * sizeof(double _Complex),
-                            cudaMemcpyDeviceToHost))
+    reverseDST(sys, dst, d_xhat, sys.sol, plan, in, out, plan2, in2, out2);
+
+    CUDA_RT_CALL(cudaMemPrefetchAsync(
+        sys.sol, sys.lat.Nxy * sizeof(double _Complex), cudaCpuDeviceId, NULL));
     POP_RANGE
 
     PUSH_RANGE("Cleanup", 5)
@@ -177,12 +176,15 @@ void solver(System sys) {
   out2 = NULL; /********************* FFTW *********************/
 #endif
 
+  // CUDA_RT_CALL(cudaFree(d_rhs));
+  CUDA_RT_CALL(cudaFree(d_rhat));
+  CUDA_RT_CALL(cudaFree(d_xhat));
+
+  CUDA_RT_CALL(cudaFreeHost(rhat));
+  CUDA_RT_CALL(cudaFreeHost(xhat));
+
   fftw_destroy_plan(plan);  /********************* FFTW *********************/
   fftw_destroy_plan(plan2); /********************* FFTW *********************/
-  free(rhat);
-  rhat = NULL;
-  free(xhat);
-  xhat = NULL;
   POP_RANGE
 
   POP_RANGE
