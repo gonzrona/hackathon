@@ -19,9 +19,6 @@ void reverseDST(System sys, DSTN dst, cuDoubleComplex *xhat,
                 fftw_complex *out, fftw_plan plan2, double *in2,
                 fftw_complex *out2);
 
-#define USE_BATCHED 1
-#define USE_CUFFTW 1
-
 #if USE_BATCHED
 void solver(System sys) {
 
@@ -176,7 +173,6 @@ void solver(System sys) {
   out2 = NULL; /********************* FFTW *********************/
 #endif
 
-  // CUDA_RT_CALL(cudaFree(d_rhs));
   CUDA_RT_CALL(cudaFree(d_rhat));
   CUDA_RT_CALL(cudaFree(d_xhat));
 
