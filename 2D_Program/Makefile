@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Xcompiler -Wall -Xcompiler -fopenmp -O2 --expt-relaxed-constexpr
 INCLUDES = -I/usr/local/include -I/usr/local/cuda/include
 LFLAGS = -L/usr/local/lib -L/usr/local/cuda/lib64 
-LIBS = -lm -lnvToolsExt -lcudart
+LIBS = -lm -lnvToolsExt
 SRCS = $(wildcard *.c) $(wildcard */*.c)
 OBJS = $(SRCS:.c=.o)
 
@@ -19,7 +19,7 @@ MAIN = Direct_Solver
 ifneq ($(origin USE_CUFFTW), undefined)
 	ifneq ($(USE_CUFFTW), 0)
 		CFLAGS += -DUSE_CUFFTW
-		LIBS += -lcufft -lcufftw
+		LIBS += -lcufft -lcufftw -lcudart
 	else
 		LIBS += -lfftw3_omp -lfftw3
 	endif
@@ -51,7 +51,7 @@ $(MAIN): $(OBJS) $(CUOBJS)
 	$(NVCC) -t 0 -ccbin $(CC) $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
 
 %.o: %.cu
-	$(NVCC) -t 0 -ccbin $(CC) -std=c++11 $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
+	$(NVCC) -t 0 -ccbin $(CC) -std=c++11 -lineinfo $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
 
 clean:
 	$(RM) *.o *~ $(MAIN) */*.o
