@@ -40,10 +40,10 @@ __global__ void load_1st_DST(const int N, const int Nx, const int Ny,
 //     }
 //   }
 __global__ void store_1st_DST(const int N, const int Nx, const int Ny,
-                              const int NC, double coef,
-                              cuDoubleComplex *__restrict__ out,
-                              cuDoubleComplex *__restrict__ out2,
-                              cuDoubleComplex *d_rhat) {
+                              const int NC, const double coef,
+                              const cuDoubleComplex *__restrict__ out,
+                              const cuDoubleComplex *__restrict__ out2,
+                              cuDoubleComplex *__restrict__ d_rhat) {
   const int tx{static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x)};
   const int strideX{static_cast<int>(blockDim.x * gridDim.x)};
 
@@ -59,7 +59,7 @@ __global__ void store_1st_DST(const int N, const int Nx, const int Ny,
   }
 }
 
-void load_1st_DST_wrapper(System sys, DSTN dst, cuDoubleComplex *d_rhs,
+void load_1st_DST_wrapper(const System sys, const DSTN dst, const cuDoubleComplex *d_rhs,
                           double *in, double *in2) {
 
   int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
@@ -81,8 +81,8 @@ void load_1st_DST_wrapper(System sys, DSTN dst, cuDoubleComplex *d_rhs,
   CUDA_RT_CALL(cudaStreamSynchronize(NULL));
 }
 
-void store_1st_DST_wrapper(System sys, DSTN dst, cuDoubleComplex *d_rhat,
-                           cuDoubleComplex *out, cuDoubleComplex *out2) {
+void store_1st_DST_wrapper(const System sys, const DSTN dst, cuDoubleComplex *d_rhat,
+                           const cuDoubleComplex *out, const cuDoubleComplex *out2) {
 
   int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
   int N = 2 * Nx + 2, NC = (N / 2) + 1;
@@ -94,7 +94,9 @@ void store_1st_DST_wrapper(System sys, DSTN dst, cuDoubleComplex *d_rhat,
   dim3 threadPerBlock{16, 16};
   dim3 blocksPerGrid(numSMs, numSMs);
 
-  void *args[]{&N, &Nx, &Ny, &NC, &dst.coef, &out, &out2, &d_rhat};
+  double coef = dst.coef;
+
+  void *args[]{&N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_rhat};
 
   CUDA_RT_CALL(cudaLaunchKernel((void *)(&store_1st_DST), blocksPerGrid,
                                 threadPerBlock, args, 0, NULL));
