@@ -68,25 +68,21 @@ void solver(System sys) {
 #endif
 
   cuDoubleComplex *d_rhs;
+  cuDoubleComplex *d_rhat;
+  cuDoubleComplex *d_xhat;
+  cuDoubleComplex *d_sol;
+
   CUDA_RT_CALL(
       cudaMalloc((void **)(&d_rhs), sys.lat.Nxy * sizeof(double _Complex)));
-  CUDA_RT_CALL(cudaMemcpy(d_rhs, sys.rhs, sys.lat.Nxy * sizeof(double _Complex),
-                          cudaMemcpyHostToDevice));
-
-  cuDoubleComplex *d_rhat;
   CUDA_RT_CALL(
       cudaMalloc((void **)(&d_rhat), sys.lat.Nxy * sizeof(double _Complex)));
-
-  cuDoubleComplex *d_xhat;
   CUDA_RT_CALL(
       cudaMalloc((void **)(&d_xhat), sys.lat.Nxy * sizeof(double _Complex)));
-  // CUDA_RT_CALL(cudaMemcpy(d_xhat, xhat, sys.lat.Nxy * sizeof(double
-  // _Complex),
-  //                         cudaMemcpyHostToDevice));
-
-  cuDoubleComplex *d_sol;
   CUDA_RT_CALL(
       cudaMalloc((void **)(&d_sol), sys.lat.Nxy * sizeof(double _Complex)));
+
+  CUDA_RT_CALL(cudaMemcpy(d_rhs, sys.rhs, sys.lat.Nxy * sizeof(double _Complex),
+                          cudaMemcpyHostToDevice));
 
   memset(in, 0, size_in);
   memset(in2, 0, size_in);
