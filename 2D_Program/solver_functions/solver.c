@@ -30,6 +30,17 @@ void reverseDST( System           sys,
                  fftw_plan        plan2,
                  double *         in2,
                  fftw_complex *   out2 );
+void fullDST( const System           sys,
+              const DSTN             dst,
+              const fftw_plan        plan,
+              const fftw_plan        plan2,
+              cuDoubleComplex *d_rhat,
+              cuDoubleComplex *d_xhat,
+              cuDoubleComplex *d_y,
+              double *         in,
+              fftw_complex *   out,
+              double *         in2,
+              fftw_complex *   out2 );
 
 #define USE_BATCHED 1
 #define USE_CUFFTW 1
@@ -82,9 +93,11 @@ void solver( System sys ) {
 
     cuDoubleComplex *d_rhat;
     cuDoubleComplex *d_xhat;
+    cuDoubleComplex *d_y;
 
-    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_rhat ), sys.lat.Nxy * sizeof( double _Complex ) ) );
-    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_xhat ), sys.lat.Nxy * sizeof( double _Complex ) ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_rhat ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_xhat ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_y ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
 
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, sys.lat.Nxy * sizeof( double _Complex ), 0, NULL ) );
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), 0, NULL ) );
@@ -104,7 +117,6 @@ void solver( System sys ) {
     int *inembed = NULL;
     int *onembed = NULL;
     /**********************BATCHED***************************/
-#
 
     fftw_plan plan, plan2; /********************* FFTW *********************/
 
@@ -115,36 +127,13 @@ void solver( System sys ) {
         rank, n, howmany, in2, inembed, istride, idist, out2, onembed, ostride, odist, FFTW_ESTIMATE );
     POP_RANGE
 
-#if USE_OMP
-#pragma omp parallel private( i, j, mx )
-    {
-#endif
+    PUSH_RANGE( "DST", 5 )
+    fullDST( sys, dst, plan, plan2, d_rhat, d_xhat, d_y, in, out, in2, out2 );
 
-        double _Complex *y = ( double _Complex * )malloc( Ny * sizeof( double _Complex ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), cudaCpuDeviceId, NULL ) );
+    POP_RANGE
 
-        PUSH_RANGE( "forwardDST", 2 )
-        forwardDST( sys, dst, sys.rhs, d_rhat, plan, in, out, plan2, in2, out2 );
-        POP_RANGE
-
-        PUSH_RANGE( "Middle stuff", 3 )
-        // middle_stuff_DST_wrapper( sys, d_rhat, d_xhat );
-        middle_stuff_ls_DST_wrapper( sys, dst, out, out2, d_rhat, in, in2, d_xhat );
-        POP_RANGE
-
-        PUSH_RANGE( "reverseDST", 4 )
-        reverseDST( sys, dst, d_xhat, sys.sol, plan, in, out, plan2, in2, out2 );
-
-        CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), cudaCpuDeviceId, NULL ) );
-        POP_RANGE
-
-        PUSH_RANGE( "Cleanup", 5 )
-
-        free( y );
-        y = NULL;
-
-#if USE_OMP
-    }
-#endif
+    PUSH_RANGE( "Cleanup", 6 )
 
 #if USE_CUFFTW
     CUDA_RT_CALL( cudaFree( in ) );

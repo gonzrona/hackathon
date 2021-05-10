@@ -8,6 +8,40 @@
 #define USE_BATCHED 1
 #define USE_CUFFTW 1
 
+#if USE_CUFFTW
+void fullDST( const System           sys,
+              const DSTN             dst,
+              const fftw_plan        plan,
+              const fftw_plan        plan2,
+              cuDoubleComplex *d_rhat,
+              cuDoubleComplex *d_xhat,
+              cuDoubleComplex *d_y,
+              double *         in,
+              fftw_complex *   out,
+              double *         in2,
+              fftw_complex *   out2 ) {
+
+    PUSH_RANGE( "forwardDST", 2 )
+    load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+    // store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
+    POP_RANGE
+
+    PUSH_RANGE( "forwardDST", 3 )
+    // middle_stuff_DST_wrapper( sys, d_rhat, d_xhat, d_y );
+    middle_stuff_ls_DST_wrapper( sys, dst, out, out2, in, in2, d_y );
+    POP_RANGE
+
+    PUSH_RANGE( "forwardDST", 4 )
+    // load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+
+    store_2st_DST_wrapper( sys, dst, out, out2, sys.sol );
+    POP_RANGE
+}
+#else
 void forwardDST( System           sys,
                  DSTN             dst,
                  cuDoubleComplex *d_rhs,
@@ -97,3 +131,4 @@ void reverseDST( System           sys,
 
 #endif
 }
+#endif

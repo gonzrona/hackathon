@@ -185,8 +185,6 @@ __global__ void middle_stuff_ls_DST( const int    N,
                                      const cuDoubleComplex *__restrict__ d_SysU,
                                      const cuDoubleComplex *__restrict__ d_SysL,
                                      const cuDoubleComplex *__restrict__ d_SysUp,
-                                     cuDoubleComplex *__restrict__ d_rhat,
-                                     cuDoubleComplex *__restrict__ d_xhat,
                                      cuDoubleComplex *__restrict__ d_y,
                                      double *__restrict__ in,
                                      double *__restrict__ in2 ) {
@@ -203,9 +201,9 @@ __global__ void middle_stuff_ls_DST( const int    N,
         d_y[tidX] = make_cuDoubleComplex( coef * -out[tidX + 1].y, coef * -out2[tidX + 1].y );
 
         for ( int j = 1; j < Ny; j++ ) {
-            temp                = cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] );
-            temp2               = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
-            temp2               = ComplexScale( temp2, coef );
+            temp               = cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] );
+            temp2              = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
+            temp2              = ComplexScale( temp2, coef );
             d_y[j * Ny + tidX] = cuCsub( temp2, temp );
         }
 
@@ -310,7 +308,10 @@ void store_2st_DST_wrapper( const System           sys,
     CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }
 
-void middle_stuff_DST_wrapper( System sys, const cuDoubleComplex *d_rhat, cuDoubleComplex *d_xhat ) {
+void middle_stuff_DST_wrapper( System                 sys,
+                               const cuDoubleComplex *d_rhat,
+                               cuDoubleComplex *      d_xhat,
+                               cuDoubleComplex *      d_y ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2;  //, NC = (N / 2) + 1;
@@ -320,10 +321,6 @@ void middle_stuff_DST_wrapper( System sys, const cuDoubleComplex *d_rhat, cuDoub
 
     dim3 threadPerBlock { 256 };
     dim3 blocksPerGrid( numSMs * 20 );
-
-    cuDoubleComplex *d_y;
-
-    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_y ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
 
     void *args[] { &N, &Nx, &Ny, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
 
@@ -337,10 +334,9 @@ void middle_stuff_ls_DST_wrapper( System                 sys,
                                   const DSTN             dst,
                                   const cuDoubleComplex *out,
                                   const cuDoubleComplex *out2,
-                                  const cuDoubleComplex *d_rhat,
                                   double *               in,
                                   double *               in2,
-                                  cuDoubleComplex *      d_xhat ) {
+                                  cuDoubleComplex *      d_y ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2, NC = ( N / 2 ) + 1;
@@ -353,11 +349,7 @@ void middle_stuff_ls_DST_wrapper( System                 sys,
     dim3 threadPerBlock { 256 };
     dim3 blocksPerGrid( numSMs * 20 );
 
-    cuDoubleComplex *d_y;
-
-    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_y ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
-
-    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y, &in, &in2 };
+    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &sys.U, &sys.L, &sys.Up, &d_y, &in, &in2 };
 
     CUDA_RT_CALL(
         cudaLaunchKernel( ( void * )( &middle_stuff_ls_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
