@@ -135,6 +135,39 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    N,
 //     xhat[j + mx] = (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
 //   }
 // }
+// __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
+//                                                            const int Nx,
+//                                                            const int Ny,
+//                                                            cuDoubleComplex *__restrict__ d_SysU,
+//                                                            cuDoubleComplex *__restrict__ d_SysL,
+//                                                            cuDoubleComplex *__restrict__ d_SysUp,
+//                                                            cuDoubleComplex *__restrict__ d_rhat,
+//                                                            cuDoubleComplex *__restrict__ d_xhat,
+//                                                            cuDoubleComplex *__restrict__ d_y ) {
+//     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
+//     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
+
+//     for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
+//         int mx = tidX * Ny;
+
+//         d_y[mx] = d_rhat[tidX];
+
+//         for ( int j = 1; j < Ny; j++ ) {
+//             d_y[j + mx] =
+//                 // d_rhat[ind(tidX, j, Nx)] - sys.L[j + mx] * d_y[(j - 1) + mx];
+//                 cuCsub( d_rhat[ind( tidX, j, Nx )], cuCmul( d_y[( j - 1 ) + mx], ( d_SysL[j + mx] ) ) );
+//         }
+
+//         d_xhat[Ny - 1 + mx] = cuCdiv( d_y[( Ny - 1 ) + mx], d_SysU[Ny - 1 + mx] );
+//         for ( int j = Ny - 2; j >= 0; j-- ) {
+//             d_xhat[j + mx] =
+//                 // (d_y[j + mx] - sys.Up[j + mx] * d_xhat[j + 1 + mx]) / sys.U[j +
+//                 // mx];
+//                 cuCdiv( cuCsub( d_y[j + mx], cuCmul( d_SysUp[j + mx], d_xhat[j + 1 + mx] ) ), d_SysU[j + mx] );
+//         }
+//     }
+// }
+
 __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
                                                            const int Nx,
                                                            const int Ny,
@@ -150,20 +183,20 @@ __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
     for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
         int mx = tidX * Ny;
 
-        d_y[mx] = d_rhat[tidX];
+        d_y[tidX] = d_rhat[tidX];
 
         for ( int j = 1; j < Ny; j++ ) {
-            d_y[j + mx] =
+            d_y[j * Ny + tidX] =
                 // d_rhat[ind(tidX, j, Nx)] - sys.L[j + mx] * d_y[(j - 1) + mx];
-                cuCsub( d_rhat[ind( tidX, j, Nx )], cuCmul( d_y[( j - 1 ) + mx], ( d_SysL[j + mx] ) ) );
+                cuCsub( d_rhat[ind( tidX, j, Nx )], cuCmul( d_y[( j - 1 ) * Ny + tidX], ( d_SysL[j + mx] ) ) );
         }
 
-        d_xhat[Ny - 1 + mx] = cuCdiv( d_y[( Ny - 1 ) + mx], d_SysU[Ny - 1 + mx] );
+        d_xhat[Ny - 1 + mx] = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[Ny - 1 + mx] );
         for ( int j = Ny - 2; j >= 0; j-- ) {
             d_xhat[j + mx] =
                 // (d_y[j + mx] - sys.Up[j + mx] * d_xhat[j + 1 + mx]) / sys.U[j +
                 // mx];
-                cuCdiv( cuCsub( d_y[j + mx], cuCmul( d_SysUp[j + mx], d_xhat[j + 1 + mx] ) ), d_SysU[j + mx] );
+                cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[j + mx], d_xhat[j + 1 + mx] ) ), d_SysU[j + mx] );
         }
     }
 }
