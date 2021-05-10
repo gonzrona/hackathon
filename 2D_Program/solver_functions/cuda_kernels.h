@@ -18,6 +18,8 @@ void load_2st_DST_wrapper(const System sys, const DSTN dst,
 void store_2st_DST_wrapper(const System sys, const DSTN dst,
                            cuDoubleComplex *d_sol, const cuDoubleComplex *out,
                            const cuDoubleComplex *out2);
+void middle_stuff_DST_wrapper(System sys, const cuDoubleComplex *d_rhat,
+                              cuDoubleComplex *d_xhat);
 
 #ifdef __cplusplus
 }

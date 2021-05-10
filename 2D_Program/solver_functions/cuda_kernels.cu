@@ -114,6 +114,54 @@ __global__ void store_2st_DST(const int N, const int Nx, const int Ny,
   }
 }
 
+// y[0] = rhat[i];
+// mx = i * Ny;
+// for (j = 1; j < Ny; j++) {
+//   y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
+// }
+// xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
+// for (j = Ny - 2; j >= 0; j--) {
+//   xhat[j + mx] = (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
+// }
+// }
+__global__ void middle_stuff_DST(const int N, const int Nx, const int Ny,
+                                 cuDoubleComplex *__restrict__ d_SysU,
+                                 cuDoubleComplex *__restrict__ d_SysL,
+                                 cuDoubleComplex *__restrict__ d_SysUp,
+                                 cuDoubleComplex *__restrict__ d_rhat,
+                                 cuDoubleComplex *__restrict__ d_xhat,
+                                 cuDoubleComplex *__restrict__ d_y) {
+  const int tx{static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x)};
+  const int strideX{static_cast<int>(blockDim.x * gridDim.x)};
+
+  // const int ty{static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y)};
+  // const int strideY{static_cast<int>(blockDim.y * gridDim.y)};
+
+  for (int tidX = tx; tidX < Nx; tidX += strideX) {
+    int mx = tidX * Ny;
+
+    d_y[mx] = d_rhat[tidX];
+
+    for (int j = 1; j < Ny; j++) {
+      d_y[j + mx] =
+          // d_rhat[ind(tidX, j, Nx)] - sys.L[j + mx] * d_y[(j - 1) + mx];
+          cuCsub(d_rhat[ind(tidX, j, Nx)],
+                 cuCmul(d_y[(j - 1) + mx], (d_SysL[j + mx])));
+    }
+
+    d_xhat[Ny - 1 + mx] = cuCdiv(d_y[(Ny - 1) + mx], d_SysU[Ny - 1 + mx]);
+
+    for (int j = Ny - 2; j >= 0; j--) {
+      d_xhat[j + mx] =
+          // (d_y[j + mx] - sys.Up[j + mx] * d_xhat[j + 1 + mx]) / sys.U[j +
+          // mx];
+          cuCdiv(
+              cuCsub(d_y[j + mx], cuCmul(d_SysUp[j + mx], d_xhat[j + 1 + mx])),
+              d_SysU[j + mx]);
+    }
+  }
+}
+
 void load_1st_DST_wrapper(const System sys, const DSTN dst,
                           const cuDoubleComplex *d_rhs, double *in,
                           double *in2) {
@@ -204,6 +252,51 @@ void store_2st_DST_wrapper(const System sys, const DSTN dst,
   void *args[]{&N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_sol};
 
   CUDA_RT_CALL(cudaLaunchKernel((void *)(&store_2st_DST), blocksPerGrid,
+                                threadPerBlock, args, 0, NULL));
+
+  CUDA_RT_CALL(cudaPeekAtLastError());
+  CUDA_RT_CALL(cudaStreamSynchronize(NULL));
+}
+
+void middle_stuff_DST_wrapper(System sys, const cuDoubleComplex *d_rhat,
+                              cuDoubleComplex *d_xhat) {
+
+  int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
+  int N = 2 * Nx + 2; //, NC = (N / 2) + 1;
+
+  int numSMs;
+  CUDA_RT_CALL(
+      cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0));
+
+  dim3 threadPerBlock{1};
+  dim3 blocksPerGrid(1);
+
+  cuDoubleComplex *d_y;
+  cuDoubleComplex *d_SysU;
+  cuDoubleComplex *d_SysL;
+  cuDoubleComplex *d_SysUp;
+  
+  CUDA_RT_CALL(
+      cudaMalloc((void **)(&d_y), sys.lat.Nxy * sizeof(cuDoubleComplex)));
+  CUDA_RT_CALL(
+      cudaMalloc((void **)(&d_SysU), sys.lat.Nxy * sizeof(cuDoubleComplex)));
+  CUDA_RT_CALL(
+      cudaMalloc((void **)(&d_SysL), sys.lat.Nxy * sizeof(cuDoubleComplex)));
+  CUDA_RT_CALL(
+      cudaMalloc((void **)(&d_SysUp), sys.lat.Nxy * sizeof(cuDoubleComplex)));
+
+  CUDA_RT_CALL(cudaMemcpy(d_SysU, sys.U, sys.lat.Nxy * sizeof(cuDoubleComplex),
+                          cudaMemcpyHostToDevice));
+  CUDA_RT_CALL(cudaMemcpy(d_SysL, sys.L, sys.lat.Nxy * sizeof(cuDoubleComplex),
+                          cudaMemcpyHostToDevice));
+  CUDA_RT_CALL(cudaMemcpy(d_SysUp, sys.Up,
+                          sys.lat.Nxy * sizeof(cuDoubleComplex),
+                          cudaMemcpyHostToDevice));
+
+  void *args[]{&N,       &Nx,     &Ny,     &d_SysU, &d_SysL,
+               &d_SysUp, &d_rhat, &d_xhat, &d_y};
+
+  CUDA_RT_CALL(cudaLaunchKernel((void *)(&middle_stuff_DST), blocksPerGrid,
                                 threadPerBlock, args, 0, NULL));
 
   CUDA_RT_CALL(cudaPeekAtLastError());

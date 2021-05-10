@@ -5,6 +5,9 @@
 #include <cuComplex.h>
 #include <cufftw.h>
 
+#define USE_BATCHED 1
+#define USE_CUFFTW 1
+
 void forwardDST(System sys, DSTN dst, cuDoubleComplex *d_rhs,
                 cuDoubleComplex *d_rhat, fftw_plan plan, double *in,
                 fftw_complex *out, fftw_plan plan2, double *in2,

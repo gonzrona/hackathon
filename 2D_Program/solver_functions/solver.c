@@ -7,6 +7,7 @@
 #include <cufftw.h>
 
 #include "cuda_helper.h"
+#include "cuda_kernels.h"
 
 void DST(DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan,
          double *in, fftw_complex *out);
@@ -18,6 +19,9 @@ void reverseDST(System sys, DSTN dst, cuDoubleComplex *xhat,
                 cuDoubleComplex *sol, fftw_plan plan, double *in,
                 fftw_complex *out, fftw_plan plan2, double *in2,
                 fftw_complex *out2);
+
+#define USE_BATCHED 1
+#define USE_CUFFTW 1
 
 #if USE_BATCHED
 void solver(System sys) {
@@ -122,21 +126,22 @@ void solver(System sys) {
     POP_RANGE
 
     PUSH_RANGE("Middle stuff", 3)
-#if USE_OMP
-#pragma omp for
-#endif
-    for (i = 0; i < Nx; i++) {
-      y[0] = rhat[i];
-      mx = i * Ny;
-      for (j = 1; j < Ny; j++) {
-        y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
-      }
-      xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
-      for (j = Ny - 2; j >= 0; j--) {
-        xhat[j + mx] =
-            (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
-      }
-    }
+    #if USE_OMP
+    #pragma omp for
+    #endif
+        for (i = 0; i < Nx; i++) {
+          y[0] = rhat[i];
+          mx = i * Ny;
+          for (j = 1; j < Ny; j++) {
+            y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
+          }
+          xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
+          for (j = Ny - 2; j >= 0; j--) {
+            xhat[j + mx] =
+                (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
+          }
+        }
+    // middle_stuff_DST_wrapper(sys, d_rhat, d_xhat);
     POP_RANGE
 
     PUSH_RANGE("reverseDST", 4)
