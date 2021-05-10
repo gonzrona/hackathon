@@ -4,6 +4,13 @@
 #include "cuda_helper.h"
 #include "cuda_kernels.h"
 
+__device__ cuDoubleComplex ComplexScale( cuDoubleComplex const &a, double const &scale ) {
+    cuDoubleComplex c;
+    c.x = a.x * scale;
+    c.y = a.y * scale;
+    return ( c );
+}
+
 // #pragma omp for
 //     for(j = 0; j < Ny; j++) {
 //         for (i=0; i<dst.Nx; i++) {
@@ -169,20 +176,20 @@ __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
 }
 
 __global__ void middle_stuff_ls_DST( const int    N,
-                                                              const int    Nx,
-                                                              const int    Ny,
-                                                              const int    NC,
-                                                              const double coef,
-                                                              cuDoubleComplex *__restrict__ out,
-                                                              cuDoubleComplex *__restrict__ out2,
-                                                              const cuDoubleComplex *__restrict__ d_SysU,
-                                                              const cuDoubleComplex *__restrict__ d_SysL,
-                                                              const cuDoubleComplex *__restrict__ d_SysUp,
-                                                              cuDoubleComplex *__restrict__ d_rhat,
-                                                              cuDoubleComplex *__restrict__ d_xhat,
-                                                              cuDoubleComplex *__restrict__ d_y,
-                                                              double *__restrict__ in,
-                                                              double *__restrict__ in2 ) {
+                                     const int    Nx,
+                                     const int    Ny,
+                                     const int    NC,
+                                     const double coef,
+                                     const cuDoubleComplex *__restrict__ out,
+                                     const cuDoubleComplex *__restrict__ out2,
+                                     const cuDoubleComplex *__restrict__ d_SysU,
+                                     const cuDoubleComplex *__restrict__ d_SysL,
+                                     const cuDoubleComplex *__restrict__ d_SysUp,
+                                     cuDoubleComplex *__restrict__ d_rhat,
+                                     cuDoubleComplex *__restrict__ d_xhat,
+                                     cuDoubleComplex *__restrict__ d_y,
+                                     double *__restrict__ in,
+                                     double *__restrict__ in2 ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -193,24 +200,24 @@ __global__ void middle_stuff_ls_DST( const int    N,
     for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
         int mx = tidX * Ny;
 
-        d_y[tidX] = make_cuDoubleComplex(coef * -out[tidX + 1].y, coef * -out2[tidX + 1].y);
+        d_y[tidX] = make_cuDoubleComplex( coef * -out[tidX + 1].y, coef * -out2[tidX + 1].y );
 
         for ( int j = 1; j < Ny; j++ ) {
-          temp = make_cuDoubleComplex(coef * -out[j * NC + tidX + 1].y, coef * -out2[j * NC + tidX + 1].y);
-            d_y[j * Ny + tidX] =
-                cuCsub( temp, cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] ) );
+            temp                = cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] );
+            temp2               = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
+            temp2               = ComplexScale( temp2, coef );
+            d_y[j * Ny + tidX] = cuCsub( temp2, temp );
         }
 
         temp = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[Ny - 1 + mx] );
 
-        in[(Ny - 1) * N + tidX + 1]  = temp.x;
-        in2[(Ny - 1) * N + tidX + 1] = temp.y;
+        in[( Ny - 1 ) * N + tidX + 1]  = temp.x;
+        in2[( Ny - 1 ) * N + tidX + 1] = temp.y;
         for ( int j = Ny - 2; j >= 0; j-- ) {
-            temp2 = 
-                cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[j + mx], temp ) ), d_SysU[j + mx] );
+            temp2 = cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[j + mx], temp ) ), d_SysU[j + mx] );
             in[j * N + tidX + 1]  = temp2.x;
             in2[j * N + tidX + 1] = temp2.y;
-            temp = temp2;
+            temp                  = temp2;
         }
     }
 }
