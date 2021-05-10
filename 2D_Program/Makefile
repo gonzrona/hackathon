@@ -14,7 +14,16 @@ ARCHES	:=-gencode arch=compute_70,code=\"compute_70,sm_70\" \
 			-gencode arch=compute_75,code=\"compute_75,sm_75\" \
 			-gencode arch=compute_80,code=\"compute_80,sm_80\"
 
+NVCC_MAJOR = $(shell ${NVCC} --version | grep "release" | cut  -f6 -d' ' | cut -c2- | cut -f1 -d'.')
+NVCC_MINOR = $(shell ${NVCC} --version | grep "release" | cut  -f6 -d' ' | cut -c2- | cut -f2 -d'.')
+
 MAIN = Direct_Solver
+
+ifeq ($(shell test $(NVCC_MAJOR) -ge 11; echo $$?),0)
+ifeq ($(shell test $(NVCC_MINOR) -ge 2; echo $$?),0)
+	THREADS = -t 0
+endif
+endif
 
 ifneq ($(origin USE_CUFFTW), undefined)
 	ifneq ($(USE_CUFFTW), 0)
@@ -33,12 +42,6 @@ ifneq ($(origin USE_COMBINE), undefined)
 	endif
 endif
 
-# ifneq ($(origin USE_BATCHED), undefined)
-# 	ifneq ($(USE_BATCHED), 0)
-# 		CFLAGS += -DUSE_BATCHED
-# 	endif
-# endif
-
 .PHONY: depend clean
 
 all: $(MAIN)
@@ -48,10 +51,10 @@ $(MAIN): $(OBJS) $(CUOBJS)
 	$(NVCC) -ccbin $(CC) $(CFLAGS) $(INCLUDES) -o ${MAIN} ${OBJS} ${CUOBJS} $(LFLAGS) $(LIBS)
 
 %.o: %.c
-	$(NVCC) -t 0 -ccbin $(CC) $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
+	$(NVCC) ${THREADS} -ccbin $(CC) $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
 
 %.o: %.cu
-	$(NVCC) -t 0 -ccbin $(CC) -std=c++11 -lineinfo $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
+	$(NVCC) ${THREADS} -ccbin $(CC) -std=c++11 -lineinfo $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
 
 clean:
 	$(RM) *.o *~ $(MAIN) */*.o
