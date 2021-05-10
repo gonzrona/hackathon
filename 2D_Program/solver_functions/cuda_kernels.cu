@@ -267,8 +267,9 @@ void middle_stuff_DST_wrapper(System sys, const cuDoubleComplex *d_rhat,
   CUDA_RT_CALL(
       cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0));
 
-  dim3 threadPerBlock{1};
-  dim3 blocksPerGrid(1);
+      dim3 threadPerBlock{256};
+      dim3 blocksPerGrid(numSMs * 20);
+    
 
   cuDoubleComplex *d_y;
   cuDoubleComplex *d_SysU;
