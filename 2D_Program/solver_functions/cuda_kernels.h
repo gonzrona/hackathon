@@ -19,6 +19,14 @@ void store_2st_DST_wrapper( const System           sys,
                             const cuDoubleComplex *out2,
                             cuDoubleComplex *      d_sol );
 void middle_stuff_DST_wrapper( System sys, const cuDoubleComplex *d_rhat, cuDoubleComplex *d_xhat );
+void middle_stuff_ls_DST_wrapper( System                 sys,
+                                  const DSTN             dst,
+                                  const cuDoubleComplex *out,
+                                  const cuDoubleComplex *out2,
+                                  const cuDoubleComplex *d_rhat,
+                                  double *               in,
+                                  double *               in2,
+                                  cuDoubleComplex *      d_xhat );
 
 #ifdef __cplusplus
 }

@@ -127,7 +127,8 @@ void solver( System sys ) {
         POP_RANGE
 
         PUSH_RANGE( "Middle stuff", 3 )
-        middle_stuff_DST_wrapper( sys, d_rhat, d_xhat );
+        // middle_stuff_DST_wrapper( sys, d_rhat, d_xhat );
+        middle_stuff_ls_DST_wrapper( sys, dst, out, out2, d_rhat, in, in2, d_xhat );
         POP_RANGE
 
         PUSH_RANGE( "reverseDST", 4 )
