@@ -20,17 +20,15 @@ void forwardDST( System           sys,
                  fftw_complex *   out2 ) {
 
 #if USE_BATCHED
-    load_1st_DST_wrapper( sys, dst, d_rhs, in, in2 );
-
-#if USE_OMP
 #pragma omp critical( fftw_execute )
-#endif
     {
+        load_1st_DST_wrapper( sys, dst, d_rhs, in, in2 );
+
         fftw_execute( plan );  /********************* FFTW *********************/
         fftw_execute( plan2 ); /********************* FFTW *********************/
-    }
 
-    store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
+        store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
+    }
 #else
 
 #pragma omp for
@@ -67,17 +65,15 @@ void reverseDST( System           sys,
                  fftw_complex *   out2 ) {
 
 #if USE_BATCHED
-    load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
-
-#if USE_OMP
 #pragma omp critical( fftw_execute )
-#endif
     {
+        load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
+
         fftw_execute( plan );  /********************* FFTW *********************/
         fftw_execute( plan2 ); /********************* FFTW *********************/
-    }
 
-    store_2st_DST_wrapper( sys, dst, out, out2, d_sol );
+        store_2st_DST_wrapper( sys, dst, out, out2, d_sol );
+    }
 #else
 
 #pragma omp for
