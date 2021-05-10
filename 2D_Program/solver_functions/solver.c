@@ -10,26 +10,26 @@
 #include "cuda_kernels.h"
 
 void DST( DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out );
-void forwardDST( System           sys,
-                 DSTN             dst,
-                 cuDoubleComplex *rhs,
-                 cuDoubleComplex *bhat,
-                 fftw_plan        plan,
-                 double *         in,
-                 fftw_complex *   out,
-                 fftw_plan        plan2,
-                 double *         in2,
-                 fftw_complex *   out2 );
-void reverseDST( System           sys,
-                 DSTN             dst,
-                 cuDoubleComplex *xhat,
-                 cuDoubleComplex *sol,
-                 fftw_plan        plan,
-                 double *         in,
-                 fftw_complex *   out,
-                 fftw_plan        plan2,
-                 double *         in2,
-                 fftw_complex *   out2 );
+// void forwardDST( System           sys,
+//                  DSTN             dst,
+//                  cuDoubleComplex *rhs,
+//                  cuDoubleComplex *bhat,
+//                  fftw_plan        plan,
+//                  double *         in,
+//                  fftw_complex *   out,
+//                  fftw_plan        plan2,
+//                  double *         in2,
+//                  fftw_complex *   out2 );
+// void reverseDST( System           sys,
+//                  DSTN             dst,
+//                  cuDoubleComplex *xhat,
+//                  cuDoubleComplex *sol,
+//                  fftw_plan        plan,
+//                  double *         in,
+//                  fftw_complex *   out,
+//                  fftw_plan        plan2,
+//                  double *         in2,
+//                  fftw_complex *   out2 );
 
 #ifdef USE_COMBINE
 void fullDST( const System     sys,
@@ -171,7 +171,7 @@ void solver( System sys ) {
     PUSH_RANGE( "solver", 0 )
 
     DSTN             dst;
-    int              i, j, mx;
+    int              i, j, my, mx;
     int              Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nxy = sys.lat.Nxy;
     double _Complex *rhat = ( double _Complex * )malloc( Nxy * sizeof( double _Complex ) );
     double _Complex *xhat = ( double _Complex * )malloc( Nxy * sizeof( double _Complex ) );
@@ -181,38 +181,37 @@ void solver( System sys ) {
     dst.N    = N;
     dst.coef = sqrt( 2.0 / ( Nx + 1 ) );
 
-#pragma omp parallel private( i, j, mx )
+#pragma omp parallel private( i, j, mx, my )
     {
+        double *      in  = ( double * )fftw_malloc( sizeof( double ) * N );
+        fftw_complex *out = ( fftw_complex * )fftw_malloc( sizeof( fftw_complex ) * NC );
 
-        double *in = ( double * )fftw_malloc( sizeof( double ) * N ); /********************* FFTW *********************/
-        double *in2 =
-            ( double * )fftw_malloc( sizeof( double ) * N ); /********************* FFTW *********************/
-        fftw_complex *out  = ( fftw_complex * )fftw_malloc( sizeof( fftw_complex ) *
-                                                           NC ); /********************* FFTW *********************/
-        fftw_complex *out2 = ( fftw_complex * )fftw_malloc( sizeof( fftw_complex ) *
-                                                            NC ); /********************* FFTW *********************/
-
-        memset( in, 0, sizeof( double ) * N );
-        memset( in2, 0, sizeof( double ) * N );
-        memset( out, 0, sizeof( fftw_complex ) * NC );
-        memset( out2, 0, sizeof( fftw_complex ) * NC );
-
-        double _Complex *y = ( double _Complex * )malloc( Ny * sizeof( double _Complex ) );
-        fftw_plan        plan, plan2; /********************* FFTW *********************/
+        double _Complex *b    = ( double _Complex * )malloc( Nx * sizeof( double _Complex ) );
+        double _Complex *bhat = ( double _Complex * )malloc( Nx * sizeof( double _Complex ) );
+        double _Complex *y    = ( double _Complex * )malloc( Ny * sizeof( double _Complex ) );
+        fftw_plan        plan;
 
         PUSH_RANGE( "1st fffw_plan", 1 )
 #pragma omp critical( make_plan )
         {
-            plan = fftw_plan_dft_r2c_1d( N, in, out, FFTW_ESTIMATE ); /********************* FFTW *********************/
-            plan2 =
-                fftw_plan_dft_r2c_1d( N, in2, out2, FFTW_ESTIMATE ); /********************* FFTW *********************/
+            plan = fftw_plan_dft_r2c_1d( N, in, out, FFTW_ESTIMATE );
         }
         POP_RANGE
 
         PUSH_RANGE( "DST", 5 )
 
         PUSH_RANGE( "forwardDST", 2 )
-        forwardDST( sys, dst, sys.rhs, rhat, plan, in, out, plan2, in2, out2 );
+#pragma omp for
+        for ( j = 0; j < Ny; j++ ) {
+            my = j * Nx;
+            for ( i = 0; i < Nx; i++ ) {
+                b[i] = sys.rhs[i + my];
+            }
+            DST( dst, b, bhat, plan, in, out );
+            for ( i = 0; i < Nx; i++ ) {
+                rhat[i + my] = bhat[i];
+            }
+        }
         POP_RANGE
 
         PUSH_RANGE( "Middle stuff", 3 )
@@ -231,22 +230,31 @@ void solver( System sys ) {
         POP_RANGE
 
         PUSH_RANGE( "reverseDST", 4 )
-        reverseDST( sys, dst, xhat, sys.sol, plan, in, out, plan2, in2, out2 );
+#pragma omp for
+        for ( j = 0; j < Ny; j++ ) {
+            my = j * Nx;
+            for ( i = 0; i < Nx; i++ ) {
+                b[i] = xhat[j + i * Ny];
+            }
+            DST( dst, b, bhat, plan, in, out );
+            for ( i = 0; i < Nx; i++ ) {
+                sys.sol[i + my] = bhat[i];
+            }
+        }
         POP_RANGE
 
         POP_RANGE
 
         PUSH_RANGE( "Cleanup", 6 )
+        fftw_destroy_plan( plan );
         free( in );
         in = NULL;
         fftw_free( out );
-        out = NULL; /********************* FFTW *********************/
-        free( in2 );
-        in = NULL;
-        fftw_free( out2 );
-        out2 = NULL; /********************* FFTW *********************/
-
-        fftw_destroy_plan( plan ); /********************* FFTW *********************/
+        out = NULL;
+        free( b );
+        b = NULL;
+        free( bhat );
+        bhat = NULL;
         free( y );
         y = NULL;
     }
