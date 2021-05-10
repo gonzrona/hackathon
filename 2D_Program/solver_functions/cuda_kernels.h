@@ -6,20 +6,19 @@
 extern "C" {
 #endif
 
-void load_1st_DST_wrapper(const System sys, const DSTN dst,
-                          const cuDoubleComplex *d_rhs, double *in,
-                          double *in2);
-void store_1st_DST_wrapper(const System sys, const DSTN dst,
-                           cuDoubleComplex *d_rhat, const cuDoubleComplex *out,
-                           const cuDoubleComplex *out2);
-void load_2st_DST_wrapper(const System sys, const DSTN dst,
-                          const cuDoubleComplex *d_xhat, double *in,
-                          double *in2);
-void store_2st_DST_wrapper(const System sys, const DSTN dst,
-                           cuDoubleComplex *d_sol, const cuDoubleComplex *out,
-                           const cuDoubleComplex *out2);
-void middle_stuff_DST_wrapper(System sys, const cuDoubleComplex *d_rhat,
-                              cuDoubleComplex *d_xhat);
+void load_1st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleComplex *d_rhs, double *in, double *in2 );
+void store_1st_DST_wrapper( const System           sys,
+                            const DSTN             dst,
+                            const cuDoubleComplex *out,
+                            const cuDoubleComplex *out2,
+                            cuDoubleComplex *      d_rhat );
+void load_2st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleComplex *d_xhat, double *in, double *in2 );
+void store_2st_DST_wrapper( const System           sys,
+                            const DSTN             dst,
+                            const cuDoubleComplex *out,
+                            const cuDoubleComplex *out2,
+                            cuDoubleComplex *      d_sol );
+void middle_stuff_DST_wrapper( System sys, const cuDoubleComplex *d_rhat, cuDoubleComplex *d_xhat );
 
 #ifdef __cplusplus
 }
