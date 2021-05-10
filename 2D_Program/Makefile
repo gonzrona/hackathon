@@ -27,17 +27,17 @@ else
 	LIBS += -lfftw3_omp -lfftw3
 endif
 
-ifneq ($(origin USE_OMP), undefined)
-	ifneq ($(USE_OMP), 0)
-		CFLAGS += -DUSE_OMP
+ifneq ($(origin USE_COMBINE), undefined)
+	ifneq ($(USE_COMBINE), 0)
+		CFLAGS += -DUSE_COMBINE
 	endif
 endif
 
-ifneq ($(origin USE_BATCHED), undefined)
-	ifneq ($(USE_BATCHED), 0)
-		CFLAGS += -DUSE_BATCHED
-	endif
-endif
+# ifneq ($(origin USE_BATCHED), undefined)
+# 	ifneq ($(USE_BATCHED), 0)
+# 		CFLAGS += -DUSE_BATCHED
+# 	endif
+# endif
 
 .PHONY: depend clean
 

@@ -175,19 +175,50 @@ __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
     }
 }
 
-__global__ void middle_stuff_ls_DST( const int    N,
-                                     const int    Nx,
-                                     const int    Ny,
-                                     const int    NC,
-                                     const double coef,
-                                     const cuDoubleComplex *__restrict__ out,
-                                     const cuDoubleComplex *__restrict__ out2,
-                                     const cuDoubleComplex *__restrict__ d_SysU,
-                                     const cuDoubleComplex *__restrict__ d_SysL,
-                                     const cuDoubleComplex *__restrict__ d_SysUp,
-                                     cuDoubleComplex *__restrict__ d_y,
-                                     double *__restrict__ in,
-                                     double *__restrict__ in2 ) {
+// #pragma omp for
+//   for (j = 0; j < Ny; j++) {
+//     my = j * Nx;
+
+//     for (i = 0; i < dst.Nx; i++) {
+//       rhat[i + my] = dst.coef * (-cimag(out[(j * NC) + i + 1]) -
+//                                  I * cimag(out2[(j * NC) + i + 1]));
+//     }
+//   }
+
+// for (i = 0; i < Nx; i++) {
+//   y[0] = rhat[i];
+//   mx = i * Ny;
+//   for (j = 1; j < Ny; j++) {
+//     y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
+//   }
+//   xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
+//   for (j = Ny - 2; j >= 0; j--) {
+//     xhat[j + mx] = (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
+//   }
+// }
+
+// #pragma omp for
+//   for (j = 0; j < Ny; j++) {
+//     for (i = 0; i < dst.Nx; i++) {
+//       in[(j * N) + i + 1] = creal(xhat[j + i * Ny]);
+//     }
+//     for (i = 0; i < dst.Nx; i++) {
+//       in2[(j * N) + i + 1] = cimag(xhat[j + i * Ny]);
+//     }
+//   }
+__global__ void __launch_bounds__( 256 ) middle_stuff_ls_DST( const int    N,
+                                                              const int    Nx,
+                                                              const int    Ny,
+                                                              const int    NC,
+                                                              const double coef,
+                                                              const cuDoubleComplex *__restrict__ out,
+                                                              const cuDoubleComplex *__restrict__ out2,
+                                                              const cuDoubleComplex *__restrict__ d_SysU,
+                                                              const cuDoubleComplex *__restrict__ d_SysL,
+                                                              const cuDoubleComplex *__restrict__ d_SysUp,
+                                                              cuDoubleComplex *__restrict__ d_y,
+                                                              double *__restrict__ in,
+                                                              double *__restrict__ in2 ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -198,13 +229,15 @@ __global__ void middle_stuff_ls_DST( const int    N,
     for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
         int mx = tidX * Ny;
 
-        d_y[tidX] = make_cuDoubleComplex( coef * -out[tidX + 1].y, coef * -out2[tidX + 1].y );
+        temp      = make_cuDoubleComplex( -out[tidX + 1].y, -out2[tidX + 1].y );
+        temp      = ComplexScale( temp, coef );
+        d_y[tidX] = temp;
 
         for ( int j = 1; j < Ny; j++ ) {
-            temp               = cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] );
-            temp2              = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
-            temp2              = ComplexScale( temp2, coef );
-            d_y[j * Ny + tidX] = cuCsub( temp2, temp );
+            temp2              = cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] );
+            temp               = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
+            temp               = ComplexScale( temp, coef );
+            d_y[j * Ny + tidX] = cuCsub( temp, temp2 );
         }
 
         temp = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[Ny - 1 + mx] );
@@ -223,7 +256,7 @@ __global__ void middle_stuff_ls_DST( const int    N,
 void load_1st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleComplex *d_rhs, double *in, double *in2 ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-    int N = 2 * Nx + 2;  //, NC = (N/2) + 1;
+    int N = 2 * Nx + 2;
 
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
@@ -267,7 +300,7 @@ void store_1st_DST_wrapper( const System           sys,
 void load_2st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleComplex *d_xhat, double *in, double *in2 ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-    int N = 2 * Nx + 2;  //, NC = (N/2) + 1;
+    int N = 2 * Nx + 2;
 
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
@@ -314,7 +347,7 @@ void middle_stuff_DST_wrapper( System                 sys,
                                cuDoubleComplex *      d_y ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-    int N = 2 * Nx + 2;  //, NC = (N / 2) + 1;
+    int N = 2 * Nx + 2;
 
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );

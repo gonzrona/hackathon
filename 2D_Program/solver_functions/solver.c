@@ -30,10 +30,22 @@ void reverseDST( System           sys,
                  fftw_plan        plan2,
                  double *         in2,
                  fftw_complex *   out2 );
-void fullDST( const System           sys,
-              const DSTN             dst,
-              const fftw_plan        plan,
-              const fftw_plan        plan2,
+
+#ifdef USE_COMBINE
+void fullDST( const System     sys,
+              const DSTN       dst,
+              const fftw_plan  plan,
+              const fftw_plan  plan2,
+              cuDoubleComplex *d_y,
+              double *         in,
+              fftw_complex *   out,
+              double *         in2,
+              fftw_complex *   out2 );
+#else
+void fullDST( const System     sys,
+              const DSTN       dst,
+              const fftw_plan  plan,
+              const fftw_plan  plan2,
               cuDoubleComplex *d_rhat,
               cuDoubleComplex *d_xhat,
               cuDoubleComplex *d_y,
@@ -41,11 +53,9 @@ void fullDST( const System           sys,
               fftw_complex *   out,
               double *         in2,
               fftw_complex *   out2 );
+#endif
 
-#define USE_BATCHED 1
-#define USE_CUFFTW 1
-
-#if USE_BATCHED
+#if USE_CUFFTW
 void solver( System sys ) {
 
     PUSH_RANGE( "solver", 0 )
@@ -66,7 +76,6 @@ void solver( System sys ) {
     size_t size_in  = sizeof( double ) * N * Ny;
     size_t size_out = sizeof( fftw_complex ) * NC * Ny;
 
-#if USE_CUFFTW
     double *      in, *in2;
     fftw_complex *out, *out2;
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in, size_in, 1 ) );
@@ -84,20 +93,16 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMemset( out, size_out, 0 ) );
     CUDA_RT_CALL( cudaMemset( out2, size_out, 0 ) );
 
-#else
-    double *      in   = ( double * )fftw_malloc( size_in );        /********************* FFTW *********************/
-    double *      in2  = ( double * )fftw_malloc( size_in );        /********************* FFTW *********************/
-    fftw_complex *out  = ( fftw_complex * )fftw_malloc( size_out ); /********************* FFTW *********************/
-    fftw_complex *out2 = ( fftw_complex * )fftw_malloc( size_out ); /********************* FFTW *********************/
-#endif
+    cuDoubleComplex *d_y;
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_y ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
 
+#ifndef USE_COMBINE
     cuDoubleComplex *d_rhat;
     cuDoubleComplex *d_xhat;
-    cuDoubleComplex *d_y;
 
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_rhat ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_xhat ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
-    CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_y ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
+#endif
 
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, sys.lat.Nxy * sizeof( double _Complex ), 0, NULL ) );
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), 0, NULL ) );
@@ -128,31 +133,26 @@ void solver( System sys ) {
     POP_RANGE
 
     PUSH_RANGE( "DST", 5 )
+#ifdef USE_COMBINE
+    fullDST( sys, dst, plan, plan2, d_y, in, out, in2, out2 );
+#else
     fullDST( sys, dst, plan, plan2, d_rhat, d_xhat, d_y, in, out, in2, out2 );
+#endif
 
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), cudaCpuDeviceId, NULL ) );
     POP_RANGE
 
     PUSH_RANGE( "Cleanup", 6 )
 
-#if USE_CUFFTW
     CUDA_RT_CALL( cudaFree( in ) );
     CUDA_RT_CALL( cudaFree( out ) );
     CUDA_RT_CALL( cudaFree( in2 ) );
     CUDA_RT_CALL( cudaFree( out2 ) );
-#else
-    free( in );
-    in = NULL;
-    fftw_free( out );
-    out = NULL; /********************* FFTW *********************/
-    free( in2 );
-    in = NULL;
-    fftw_free( out2 );
-    out2 = NULL; /********************* FFTW *********************/
-#endif
 
+#ifndef USE_COMBINE
     CUDA_RT_CALL( cudaFree( d_rhat ) );
     CUDA_RT_CALL( cudaFree( d_xhat ) );
+#endif
 
     CUDA_RT_CALL( cudaFreeHost( rhat ) );
     CUDA_RT_CALL( cudaFreeHost( xhat ) );
@@ -181,40 +181,27 @@ void solver( System sys ) {
     dst.N    = N;
     dst.coef = sqrt( 2.0 / ( Nx + 1 ) );
 
-#if USE_OMP
 #pragma omp parallel private( i, j, mx )
     {
-#endif
 
-        size_t        size_in  = sizeof( double ) * N;
-        size_t        size_out = sizeof( fftw_complex ) * NC;
+        double *in = ( double * )fftw_malloc( sizeof( double ) * N ); /********************* FFTW *********************/
+        double *in2 =
+            ( double * )fftw_malloc( sizeof( double ) * N ); /********************* FFTW *********************/
+        fftw_complex *out  = ( fftw_complex * )fftw_malloc( sizeof( fftw_complex ) *
+                                                           NC ); /********************* FFTW *********************/
+        fftw_complex *out2 = ( fftw_complex * )fftw_malloc( sizeof( fftw_complex ) *
+                                                            NC ); /********************* FFTW *********************/
 
-#if USE_CUFFTW
-        double *      in, *in2;
-        fftw_complex *out, *out2;
-        CUDA_RT_CALL( cudaMallocHost( ( void ** )&in, size_in ) );
-        CUDA_RT_CALL( cudaMallocHost( ( void ** )&in2, size_in ) );
-        CUDA_RT_CALL( cudaMallocHost( ( void ** )&out, size_out ) );
-        CUDA_RT_CALL( cudaMallocHost( ( void ** )&out2, size_out ) );
-#else
-    double *      in   = ( double * )fftw_malloc( size_in );        /********************* FFTW *********************/
-    double *      in2  = ( double * )fftw_malloc( size_in );        /********************* FFTW *********************/
-    fftw_complex *out  = ( fftw_complex * )fftw_malloc( size_out ); /********************* FFTW *********************/
-    fftw_complex *out2 = ( fftw_complex * )fftw_malloc( size_out ); /********************* FFTW *********************/
-#endif
-
-        memset( in, 0, size_in );
-        memset( in2, 0, size_in );
-        memset( out, 0, size_out );
-        memset( out2, 0, size_out );
+        memset( in, 0, sizeof( double ) * N );
+        memset( in2, 0, sizeof( double ) * N );
+        memset( out, 0, sizeof( fftw_complex ) * NC );
+        memset( out2, 0, sizeof( fftw_complex ) * NC );
 
         double _Complex *y = ( double _Complex * )malloc( Ny * sizeof( double _Complex ) );
         fftw_plan        plan, plan2; /********************* FFTW *********************/
 
         PUSH_RANGE( "1st fffw_plan", 1 )
-#if USE_OMP
 #pragma omp critical( make_plan )
-#endif
         {
             plan = fftw_plan_dft_r2c_1d( N, in, out, FFTW_ESTIMATE ); /********************* FFTW *********************/
             plan2 =
@@ -222,14 +209,14 @@ void solver( System sys ) {
         }
         POP_RANGE
 
+        PUSH_RANGE( "DST", 5 )
+
         PUSH_RANGE( "forwardDST", 2 )
         forwardDST( sys, dst, sys.rhs, rhat, plan, in, out, plan2, in2, out2 );
         POP_RANGE
 
         PUSH_RANGE( "Middle stuff", 3 )
-#if USE_OMP
 #pragma omp for
-#endif
         for ( i = 0; i < Nx; i++ ) {
             y[0] = rhat[i];
             mx   = i * Ny;
@@ -247,30 +234,22 @@ void solver( System sys ) {
         reverseDST( sys, dst, xhat, sys.sol, plan, in, out, plan2, in2, out2 );
         POP_RANGE
 
-        PUSH_RANGE( "Cleanup", 5 )
-#if USE_CUFFTW
-        CUDA_RT_CALL( cudaFreeHost( in ) );
-        CUDA_RT_CALL( cudaFreeHost( out ) );
-        CUDA_RT_CALL( cudaFreeHost( in2 ) );
-        CUDA_RT_CALL( cudaFreeHost( out2 ) );
-#else
-    free( in );
-    in = NULL;
-    fftw_free( out );
-    out = NULL; /********************* FFTW *********************/
-    free( in2 );
-    in = NULL;
-    fftw_free( out2 );
-    out2 = NULL; /********************* FFTW *********************/
-#endif
-        fftw_destroy_plan( plan );  /********************* FFTW *********************/
-        fftw_destroy_plan( plan2 ); /********************* FFTW *********************/
+        POP_RANGE
+
+        PUSH_RANGE( "Cleanup", 6 )
+        free( in );
+        in = NULL;
+        fftw_free( out );
+        out = NULL; /********************* FFTW *********************/
+        free( in2 );
+        in = NULL;
+        fftw_free( out2 );
+        out2 = NULL; /********************* FFTW *********************/
+
+        fftw_destroy_plan( plan ); /********************* FFTW *********************/
         free( y );
         y = NULL;
-
-#if USE_OMP
     }
-#endif
 
     free( rhat );
     rhat = NULL;

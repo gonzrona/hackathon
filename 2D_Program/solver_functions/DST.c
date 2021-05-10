@@ -5,14 +5,40 @@
 #include <cuComplex.h>
 #include <cufftw.h>
 
-#define USE_BATCHED 1
-#define USE_CUFFTW 1
-
 #if USE_CUFFTW
-void fullDST( const System           sys,
-              const DSTN             dst,
-              const fftw_plan        plan,
-              const fftw_plan        plan2,
+#ifdef USE_COMBINE
+void fullDST( const System     sys,
+              const DSTN       dst,
+              const fftw_plan  plan,
+              const fftw_plan  plan2,
+              cuDoubleComplex *d_y,
+              double *         in,
+              fftw_complex *   out,
+              double *         in2,
+              fftw_complex *   out2 ) {
+
+    PUSH_RANGE( "forwardDST", 2 )
+    load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+    POP_RANGE
+
+    PUSH_RANGE( "forwardDST", 3 )
+    middle_stuff_ls_DST_wrapper( sys, dst, out, out2, in, in2, d_y );
+    POP_RANGE
+
+    PUSH_RANGE( "forwardDST", 4 )
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+
+    store_2st_DST_wrapper( sys, dst, out, out2, sys.sol );
+    POP_RANGE
+}
+#else
+void fullDST( const System     sys,
+              const DSTN       dst,
+              const fftw_plan  plan,
+              const fftw_plan  plan2,
               cuDoubleComplex *d_rhat,
               cuDoubleComplex *d_xhat,
               cuDoubleComplex *d_y,
@@ -25,27 +51,27 @@ void fullDST( const System           sys,
     load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
     fftw_execute( plan );  /********************* FFTW *********************/
     fftw_execute( plan2 ); /********************* FFTW *********************/
-    // store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
+    store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
     POP_RANGE
 
     PUSH_RANGE( "forwardDST", 3 )
-    // middle_stuff_DST_wrapper( sys, d_rhat, d_xhat, d_y );
-    middle_stuff_ls_DST_wrapper( sys, dst, out, out2, in, in2, d_y );
+    middle_stuff_DST_wrapper( sys, d_rhat, d_xhat, d_y );
     POP_RANGE
 
     PUSH_RANGE( "forwardDST", 4 )
-    // load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
+    load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
     fftw_execute( plan );  /********************* FFTW *********************/
     fftw_execute( plan2 ); /********************* FFTW *********************/
 
     store_2st_DST_wrapper( sys, dst, out, out2, sys.sol );
     POP_RANGE
 }
+#endif
 #else
 void forwardDST( System           sys,
                  DSTN             dst,
-                 cuDoubleComplex *d_rhs,
-                 cuDoubleComplex *d_rhat,
+                 double _Complex *rhs,
+                 double _Complex *rhat,
                  fftw_plan        plan,
                  double *         in,
                  fftw_complex *   out,
@@ -53,17 +79,8 @@ void forwardDST( System           sys,
                  double *         in2,
                  fftw_complex *   out2 ) {
 
-#if USE_BATCHED
-#pragma omp critical( fftw_execute )
-    {
-        load_1st_DST_wrapper( sys, dst, d_rhs, in, in2 );
-
-        fftw_execute( plan );  /********************* FFTW *********************/
-        fftw_execute( plan2 ); /********************* FFTW *********************/
-
-        // store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
-    }
-#else
+    int i, j, my;
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
 
 #pragma omp for
     for ( j = 0; j < Ny; j++ ) {
@@ -83,14 +100,12 @@ void forwardDST( System           sys,
             rhat[i + my] = dst.coef * ( -cimag( out[i + 1] ) - I * cimag( out2[i + 1] ) );
         }
     }
-
-#endif
 }
 
 void reverseDST( System           sys,
                  DSTN             dst,
-                 cuDoubleComplex *d_xhat,
-                 cuDoubleComplex *d_sol,
+                 double _Complex *xhat,
+                 double _Complex *sol,
                  fftw_plan        plan,
                  double *         in,
                  fftw_complex *   out,
@@ -98,17 +113,8 @@ void reverseDST( System           sys,
                  double *         in2,
                  fftw_complex *   out2 ) {
 
-#if USE_BATCHED
-#pragma omp critical( fftw_execute )
-    {
-        // load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
-
-        fftw_execute( plan );  /********************* FFTW *********************/
-        fftw_execute( plan2 ); /********************* FFTW *********************/
-
-        store_2st_DST_wrapper( sys, dst, out, out2, d_sol );
-    }
-#else
+    int i, j, my;
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
 
 #pragma omp for
     for ( j = 0; j < Ny; j++ ) {
@@ -128,7 +134,5 @@ void reverseDST( System           sys,
             sol[i + my] = dst.coef * ( -cimag( out[i + 1] ) - I * cimag( out2[i + 1] ) );
         }
     }
-
-#endif
 }
 #endif
