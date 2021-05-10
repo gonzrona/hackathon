@@ -21,25 +21,25 @@ System defineSystem(int argc, char **argv) {
         else { sys.order = second; }
         sys.lat.Nx = atoi(argv[2]);
         sys.lat.Ny = sys.lat.Nx;
-        printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
+        // printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
     }
     else if (argc == 2) {
         if (atoi(argv[1]) == 6) { sys.order = sixth; }
         else if (atoi(argv[1]) == 4) { sys.order = fourth; }
         else { sys.order = second; }
-        printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
-        printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
-        printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
+        // printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
+        // printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
+        // printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
     }
     else {
-        int order;
-        printf("Enter Order (2, 4, or 6): "); scanf("%d", &order);
-        if (order == 6) { sys.order = sixth; }
-        else if (order == 4) { sys.order = fourth; }
-        else { sys.order = second; }
-        printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
-        printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
-        printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
+        // int order;
+        // printf("Enter Order (2, 4, or 6): "); scanf("%d", &order);
+        // if (order == 6) { sys.order = sixth; }
+        // else if (order == 4) { sys.order = fourth; }
+        // else { sys.order = second; }
+        // printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
+        // printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
+        // printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
     }
     
     if (sys.order == sixth && sys.lat.Nx != sys.lat.Ny) {

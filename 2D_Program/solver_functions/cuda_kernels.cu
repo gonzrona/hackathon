@@ -150,7 +150,6 @@ __global__ void middle_stuff_DST(const int N, const int Nx, const int Ny,
     }
 
     d_xhat[Ny - 1 + mx] = cuCdiv(d_y[(Ny - 1) + mx], d_SysU[Ny - 1 + mx]);
-
     for (int j = Ny - 2; j >= 0; j--) {
       d_xhat[j + mx] =
           // (d_y[j + mx] - sys.Up[j + mx] * d_xhat[j + 1 + mx]) / sys.U[j +

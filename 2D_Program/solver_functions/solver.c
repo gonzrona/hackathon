@@ -30,7 +30,7 @@ void solver(System sys) {
 
   DSTN dst;
   int i, j, mx;
-  int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nxy = sys.lat.Nxy;
+  int Nx = sys.lat.Nx, Ny = sys.lat.Ny; //, Nxy = sys.lat.Nxy;
 
   double _Complex *rhat;
   double _Complex *xhat;
@@ -126,27 +126,28 @@ void solver(System sys) {
     POP_RANGE
 
     PUSH_RANGE("Middle stuff", 3)
-    #if USE_OMP
-    #pragma omp for
-    #endif
-        for (i = 0; i < Nx; i++) {
-          y[0] = rhat[i];
-          mx = i * Ny;
-          for (j = 1; j < Ny; j++) {
-            y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
-          }
-          xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
-          for (j = Ny - 2; j >= 0; j--) {
-            xhat[j + mx] =
-                (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
-          }
-        }
-    // middle_stuff_DST_wrapper(sys, d_rhat, d_xhat);
+    // #if USE_OMP
+    // #pragma omp for
+    // #endif
+    //     for (i = 0; i < Nx; i++) {
+    //       y[0] = rhat[i];
+    //       mx = i * Ny;
+    //       for (j = 1; j < Ny; j++) {
+    //         y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
+    //       }
+    //       xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
+    //       printf("1. xhat = %f %f @ %d\n", creal(xhat[Ny - 1 + mx]), cimag(xhat[Ny - 1 + mx]), mx);
+    //       for (j = Ny - 2; j >= 0; j--) {
+    //         xhat[j + mx] =
+    //             (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
+    //             printf("2. xhat = %f %f @ %d %d\n", creal(xhat[j + mx]), cimag(xhat[j + mx]), mx, j);
+    //       }
+          
+    //     }
+    middle_stuff_DST_wrapper(sys, d_rhat, d_xhat);
     POP_RANGE
 
     PUSH_RANGE("reverseDST", 4)
-    CUDA_RT_CALL(cudaMemcpy(d_xhat, xhat, sys.lat.Nxy * sizeof(double _Complex),
-                            cudaMemcpyHostToDevice));
     reverseDST(sys, dst, d_xhat, sys.sol, plan, in, out, plan2, in2, out2);
 
     CUDA_RT_CALL(cudaMemPrefetchAsync(
