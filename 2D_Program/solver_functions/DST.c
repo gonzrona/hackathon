@@ -7,23 +7,28 @@
 
 #if USE_CUFFTW
 #ifdef USE_COMBINE
-void fullDST( const System     sys,
-              const DSTN       dst,
-              const fftw_plan  plan,
-              const fftw_plan  plan2,
-              cuDoubleComplex *d_y,
-              double *         in,
-              fftw_complex *   out,
-              double *         in2,
-              fftw_complex *   out2 ) {
+void fullDST( const cudaStream_t *streams,
+              const System        sys,
+              const DSTN          dst,
+              const fftw_plan     plan,
+              const fftw_plan     plan2,
+              cuDoubleComplex *   d_y,
+              double *            in,
+              fftw_complex *      out,
+              double *            in2,
+              fftw_complex *      out2 ) {
 
     PUSH_RANGE( "forwardDST", 2 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
     load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
+
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[1] ) );
     fftw_execute( plan );  /********************* FFTW *********************/
     fftw_execute( plan2 ); /********************* FFTW *********************/
     POP_RANGE
 
     PUSH_RANGE( "forwardDST", 3 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[2] ) );
     middle_stuff_ls_DST_wrapper( sys, dst, out, out2, in, in2, d_y );
     POP_RANGE
 
@@ -31,34 +36,41 @@ void fullDST( const System     sys,
     fftw_execute( plan );  /********************* FFTW *********************/
     fftw_execute( plan2 ); /********************* FFTW *********************/
 
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[3] ) );
     store_2st_DST_wrapper( sys, dst, out, out2, sys.sol );
     POP_RANGE
 }
 #else
-void fullDST( const System     sys,
-              const DSTN       dst,
-              const fftw_plan  plan,
-              const fftw_plan  plan2,
-              cuDoubleComplex *d_rhat,
-              cuDoubleComplex *d_xhat,
-              cuDoubleComplex *d_y,
-              double *         in,
-              fftw_complex *   out,
-              double *         in2,
-              fftw_complex *   out2 ) {
+void fullDST( const cudaStream_t *streams,
+              const System        sys,
+              const DSTN          dst,
+              const fftw_plan     plan,
+              const fftw_plan     plan2,
+              cuDoubleComplex *   d_rhat,
+              cuDoubleComplex *   d_xhat,
+              cuDoubleComplex *   d_y,
+              double *            in,
+              fftw_complex *      out,
+              double *            in2,
+              fftw_complex *      out2 ) {
 
     PUSH_RANGE( "forwardDST", 2 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
     load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
+
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[1] ) );
     fftw_execute( plan );  /********************* FFTW *********************/
     fftw_execute( plan2 ); /********************* FFTW *********************/
     store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
     POP_RANGE
 
     PUSH_RANGE( "forwardDST", 3 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[2] ) );
     middle_stuff_DST_wrapper( sys, d_rhat, d_xhat, d_y );
     POP_RANGE
 
     PUSH_RANGE( "forwardDST", 4 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[3] ) );
     load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
     fftw_execute( plan );  /********************* FFTW *********************/
     fftw_execute( plan2 ); /********************* FFTW *********************/
