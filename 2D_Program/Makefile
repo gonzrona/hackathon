@@ -28,7 +28,7 @@ endif
 ifneq ($(origin USE_CUFFTW), undefined)
 	ifneq ($(USE_CUFFTW), 0)
 		CFLAGS += -DUSE_CUFFTW
-		LIBS += -lcufft -lcufftw -lcudart
+		LIBS += -lcufft -lcudart
 	else
 		LIBS += -lfftw3_omp -lfftw3
 	endif

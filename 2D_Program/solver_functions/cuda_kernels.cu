@@ -206,24 +206,24 @@ __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
 //     }
 //   }
 __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
-                                                              const int    Nx,
-                                                              const int    Ny,
-                                                              const int    NC,
-                                                              const double coef,
-                                                              const cuDoubleComplex *__restrict__ out,
-                                                              const cuDoubleComplex *__restrict__ out2,
-                                                              const cuDoubleComplex *__restrict__ d_SysU,
-                                                              const cuDoubleComplex *__restrict__ d_SysL,
-                                                              const cuDoubleComplex *__restrict__ d_SysUp,
-                                                              cuDoubleComplex *__restrict__ d_y,
-                                                              double *__restrict__ in,
-                                                              double *__restrict__ in2 ) {
+                                                             const int    Nx,
+                                                             const int    Ny,
+                                                             const int    NC,
+                                                             const double coef,
+                                                             const cuDoubleComplex *__restrict__ out,
+                                                             const cuDoubleComplex *__restrict__ out2,
+                                                             const cuDoubleComplex *__restrict__ d_SysU,
+                                                             const cuDoubleComplex *__restrict__ d_SysL,
+                                                             const cuDoubleComplex *__restrict__ d_SysUp,
+                                                             cuDoubleComplex *__restrict__ d_y,
+                                                             double *__restrict__ in,
+                                                             double *__restrict__ in2 ) {
 
     const int tidX { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
 
     cuDoubleComplex temp {};
 
-    if (tidX < Nx) {
+    if ( tidX < Nx ) {
         int mx = Ny * tidX;
 
         temp      = make_cuDoubleComplex( -out[tidX + 1].y, -out2[tidX + 1].y );
@@ -242,7 +242,7 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
 
         in[( Ny - 1 ) * N + tidX + 1]  = temp.x;
         in2[( Ny - 1 ) * N + tidX + 1] = temp.y;
-#pragma unroll 8
+#pragma unroll 4
         for ( int j = Ny - 2; j >= 0; j-- ) {
             cuDoubleComplex temp2 =
                 cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[mx + j], temp ) ), d_SysU[mx + j] );
@@ -253,7 +253,12 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
     }
 }
 
-void load_1st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleComplex *d_rhs, double *in, double *in2 ) {
+void load_1st_DST_wrapper( const cudaStream_t     stream,
+                           const System           sys,
+                           const DSTN             dst,
+                           const cuDoubleComplex *d_rhs,
+                           double *               in,
+                           double *               in2 ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2;
@@ -266,13 +271,13 @@ void load_1st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleCompl
 
     void *args[] { &N, &Nx, &Ny, &d_rhs, &in, &in2 };
 
-    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
+    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-    CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }
 
-void store_1st_DST_wrapper( const System           sys,
+void store_1st_DST_wrapper( const cudaStream_t     stream,
+                            const System           sys,
                             const DSTN             dst,
                             const cuDoubleComplex *out,
                             const cuDoubleComplex *out2,
@@ -291,13 +296,17 @@ void store_1st_DST_wrapper( const System           sys,
 
     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_rhat };
 
-    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
+    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-    CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }
 
-void load_2st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleComplex *d_xhat, double *in, double *in2 ) {
+void load_2st_DST_wrapper( const cudaStream_t     stream,
+                           const System           sys,
+                           const DSTN             dst,
+                           const cuDoubleComplex *d_xhat,
+                           double *               in,
+                           double *               in2 ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2;
@@ -310,13 +319,13 @@ void load_2st_DST_wrapper( const System sys, const DSTN dst, const cuDoubleCompl
 
     void *args[] { &N, &Nx, &Ny, &d_xhat, &in, &in2 };
 
-    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
+    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-    CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }
 
-void store_2st_DST_wrapper( const System           sys,
+void store_2st_DST_wrapper( const cudaStream_t     stream,
+                            const System           sys,
                             const DSTN             dst,
                             const cuDoubleComplex *out,
                             const cuDoubleComplex *out2,
@@ -335,13 +344,13 @@ void store_2st_DST_wrapper( const System           sys,
 
     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_sol };
 
-    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
+    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-    CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }
 
-void middle_stuff_DST_wrapper( System                 sys,
+void middle_stuff_DST_wrapper( const cudaStream_t     stream,
+                               System                 sys,
                                const cuDoubleComplex *d_rhat,
                                cuDoubleComplex *      d_xhat,
                                cuDoubleComplex *      d_y ) {
@@ -357,13 +366,13 @@ void middle_stuff_DST_wrapper( System                 sys,
 
     void *args[] { &N, &Nx, &Ny, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
 
-    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &middle_stuff_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
+    CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &middle_stuff_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-    CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }
 
-void middle_stuff_ls_DST_wrapper( System                 sys,
+void middle_stuff_ls_DST_wrapper( const cudaStream_t     stream,
+                                  System                 sys,
                                   const DSTN             dst,
                                   const cuDoubleComplex *out,
                                   const cuDoubleComplex *out2,
@@ -380,13 +389,12 @@ void middle_stuff_ls_DST_wrapper( System                 sys,
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
     int threadPerBlock { 64 };
-    int blocksPerGrid { (N + threadPerBlock - 1) / threadPerBlock };
+    int blocksPerGrid { ( N + threadPerBlock - 1 ) / threadPerBlock };
 
     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &sys.U, &sys.L, &sys.Up, &d_y, &in, &in2 };
 
     CUDA_RT_CALL(
-        cudaLaunchKernel( ( void * )( &middle_stuff_ls_DST ), blocksPerGrid, threadPerBlock, args, 0, NULL ) );
+        cudaLaunchKernel( ( void * )( &middle_stuff_ls_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-    CUDA_RT_CALL( cudaStreamSynchronize( NULL ) );
 }

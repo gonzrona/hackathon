@@ -10,33 +10,14 @@
 #include "cuda_kernels.h"
 
 void DST( DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out );
-// void forwardDST( System           sys,
-//                  DSTN             dst,
-//                  cuDoubleComplex *rhs,
-//                  cuDoubleComplex *bhat,
-//                  fftw_plan        plan,
-//                  double *         in,
-//                  fftw_complex *   out,
-//                  fftw_plan        plan2,
-//                  double *         in2,
-//                  fftw_complex *   out2 );
-// void reverseDST( System           sys,
-//                  DSTN             dst,
-//                  cuDoubleComplex *xhat,
-//                  cuDoubleComplex *sol,
-//                  fftw_plan        plan,
-//                  double *         in,
-//                  fftw_complex *   out,
-//                  fftw_plan        plan2,
-//                  double *         in2,
-//                  fftw_complex *   out2 );
 
 #ifdef USE_COMBINE
 void fullDST( const cudaStream_t *streams,
+              const cudaEvent_t * events,
               const System        sys,
               const DSTN          dst,
-              const fftw_plan     plan,
-              const fftw_plan     plan2,
+              const cufftHandle   plan,
+              cuDoubleComplex *   d_workspace[2],
               cuDoubleComplex *   d_y,
               double *            in,
               fftw_complex *      out,
@@ -44,10 +25,10 @@ void fullDST( const cudaStream_t *streams,
               fftw_complex *      out2 );
 #else
 void fullDST( const cudaStream_t *streams,
+              const cudaEvent_t * events,
               const System        sys,
               const DSTN          dst,
-              const fftw_plan     plan,
-              const fftw_plan     plan2,
+              const cufftHandle   plan,
               cuDoubleComplex *   d_rhat,
               cuDoubleComplex *   d_xhat,
               cuDoubleComplex *   d_y,
@@ -62,12 +43,6 @@ void solver( System sys ) {
 
     PUSH_RANGE( "solver", 0 )
 
-    int          num_streams = 4;
-    cudaStream_t streams[num_streams];
-    for ( int i = 0; i < num_streams; i++ ) {
-        CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
-    }
-
     DSTN dst;
     int  Nx = sys.lat.Nx, Ny = sys.lat.Ny;  //, Nxy = sys.lat.Nxy;
 
@@ -81,20 +56,27 @@ void solver( System sys ) {
 
     double *      in, *in2;
     fftw_complex *out, *out2;
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in, size_in, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in2, size_in, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out, size_out, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out2, size_out, 1 ) );
 
-    CUDA_RT_CALL( cudaMemPrefetchAsync( in, size_in, 0, streams[0] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( in2, size_in, 0, streams[0] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( out, size_out, 0, streams[1] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( out2, size_out, 0, streams[1] ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &in ), size_in ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &in2 ), size_in ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &out ), size_out ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &out2 ), size_out ) );
 
-    CUDA_RT_CALL( cudaMemsetAsync( in, size_in, 0, streams[0] ) );
-    CUDA_RT_CALL( cudaMemsetAsync( in2, size_in, 0, streams[0] ) );
-    CUDA_RT_CALL( cudaMemsetAsync( out, size_out, 0, streams[1] ) );
-    CUDA_RT_CALL( cudaMemsetAsync( out2, size_out, 0, streams[1] ) );
+    PUSH_RANGE( "stream creation", 7 )
+    int          num_streams = 5;
+    cudaStream_t streams[num_streams];
+    for ( int i = 0; i < num_streams; i++ ) {
+        CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
+    }
+    POP_RANGE
+
+    PUSH_RANGE( "stream creation", 7 )
+    int         num_events = 5;
+    cudaEvent_t events[num_events];
+    for ( int i = 0; i < num_events; i++ ) {
+        CUDA_RT_CALL( cudaEventCreateWithFlags( &events[i], cudaEventDisableTiming ) );
+    }
+    POP_RANGE
 
     cuDoubleComplex *d_y;
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_y ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
@@ -107,13 +89,19 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &d_xhat ), sys.lat.Nxy * sizeof( cuDoubleComplex ) ) );
 #endif
 
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[0] ) );
+    CUDA_RT_CALL( cudaMemsetAsync( in, size_in, 0, NULL ) );
+    CUDA_RT_CALL( cudaMemsetAsync( in2, size_in, 0, NULL ) );
+    CUDA_RT_CALL( cudaMemsetAsync( out, size_out, 0, NULL ) );
+    CUDA_RT_CALL( cudaMemsetAsync( out2, size_out, 0, NULL ) );
 
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[2] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[2] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[2] ) );
+    // The code should be here, BUT there's a bug in cuFFT
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[2] ) );
 
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[4] ) );
 
     /**********************BATCHED***************************/
     int  rank    = 1; /* not 2: we are computing 1d transforms */
@@ -127,23 +115,39 @@ void solver( System sys ) {
     int *onembed = NULL;
     /**********************BATCHED***************************/
 
-    fftw_plan plan, plan2; /********************* FFTW *********************/
+    PUSH_RANGE( "cufft creation", 7 )
+#ifdef USE_COMBINE
+    cufftHandle      plan;
+    size_t           workspace;
+    cuDoubleComplex *d_workspace[2];
 
-    PUSH_RANGE( "1st fffw_plan", 1 )
-    plan = fftw_plan_many_dft_r2c(
-        rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_ESTIMATE );
-    plan2 = fftw_plan_many_dft_r2c(
-        rank, n, howmany, in2, inembed, istride, idist, out2, onembed, ostride, odist, FFTW_ESTIMATE );
+    CUDA_RT_CALL( cufftCreate( &plan ) );
+    CUDA_RT_CALL( cufftSetAutoAllocation( plan, 0 ) );
+    CUDA_RT_CALL( cufftMakePlanMany(
+        plan, rank, n, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, howmany, &workspace ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )&d_workspace[0], workspace ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )&d_workspace[1], workspace ) );
+#else
+    cufftHandle     plan;
+    size_t          workspace;
+    cuDoubleComplex d_workspace;
+
+    CUDA_RT_CALL( cufftCreate( &plan ) );
+    CUDA_RT_CALL( cufftMakePlanMany(
+        plan, rank, n, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, howmany, &workspace ) );
+
+#endif
     POP_RANGE
 
     PUSH_RANGE( "DST", 5 )
 #ifdef USE_COMBINE
-    fullDST( streams, sys, dst, plan, plan2, d_y, in, out, in2, out2 );
+    fullDST( streams, events, sys, dst, plan, d_workspace, d_y, in, out, in2, out2 );
 #else
-    fullDST( streams, sys, dst, plan, plan2, d_rhat, d_xhat, d_y, in, out, in2, out2 );
+    fullDST( streams, events, sys, dst, plan, d_rhat, d_xhat, d_y, in, out, in2, out2 );
 #endif
 
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), cudaCpuDeviceId, NULL ) );
+    CUDA_RT_CALL(
+        cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), cudaCpuDeviceId, streams[0] ) );
     POP_RANGE
 
     PUSH_RANGE( "Cleanup", 6 )
@@ -162,8 +166,9 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaFree( d_xhat ) );
 #endif
 
-    fftw_destroy_plan( plan );  /********************* FFTW *********************/
-    fftw_destroy_plan( plan2 ); /********************* FFTW *********************/
+    // for ( int i = 0; i < 2; i++ ) {
+    CUDA_RT_CALL( cufftDestroy( plan ) ); /********************* FFTW *********************/
+    // }
     POP_RANGE
 
     POP_RANGE
