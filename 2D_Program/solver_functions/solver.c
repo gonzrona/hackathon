@@ -94,15 +94,6 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMemsetAsync( out, size_out, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out2, size_out, 0, NULL ) );
 
-    // The code should be here, BUT there's a bug in cuFFT
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[2] ) );
-
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
-
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[4] ) );
-
     /**********************BATCHED***************************/
     int  rank    = 1; /* not 2: we are computing 1d transforms */
     int  n[]     = { N };
@@ -135,9 +126,17 @@ void solver( System sys ) {
     CUDA_RT_CALL( cufftCreate( &plan ) );
     CUDA_RT_CALL( cufftMakePlanMany(
         plan, rank, n, inembed, istride, idist, onembed, ostride, odist, CUFFT_D2Z, howmany, &workspace ) );
-
 #endif
     POP_RANGE
+
+    // The code should be here, BUT there's a bug in cuFFT
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[2] ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[3] ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, sys.lat.Nxy * sizeof( double _Complex ), 0, streams[4] ) );
 
     PUSH_RANGE( "DST", 5 )
 #ifdef USE_COMBINE
