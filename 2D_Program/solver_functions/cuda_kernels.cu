@@ -1,5 +1,4 @@
 #include <stdio.h>
-// #include <complex.h>
 
 #include "cuda_helper.h"
 #include "cuda_kernels.h"
@@ -206,7 +205,7 @@ __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
 //       in2[(j * N) + i + 1] = cimag(xhat[j + i * Ny]);
 //     }
 //   }
-__global__ void __launch_bounds__( 256 ) middle_stuff_ls_DST( const int    N,
+__global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
                                                               const int    Nx,
                                                               const int    Ny,
                                                               const int    NC,
@@ -220,32 +219,33 @@ __global__ void __launch_bounds__( 256 ) middle_stuff_ls_DST( const int    N,
                                                               double *__restrict__ in,
                                                               double *__restrict__ in2 ) {
 
-    const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
-    const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
+    const int tidX { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
 
     cuDoubleComplex temp {};
-    cuDoubleComplex temp2 {};
 
-    for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-        int mx = tidX * Ny;
+    if (tidX < Nx) {
+        int mx = Ny * tidX;
 
         temp      = make_cuDoubleComplex( -out[tidX + 1].y, -out2[tidX + 1].y );
         temp      = ComplexScale( temp, coef );
         d_y[tidX] = temp;
 
+#pragma unroll 8
         for ( int j = 1; j < Ny; j++ ) {
-            temp2              = cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] );
-            temp               = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
-            temp               = ComplexScale( temp, coef );
-            d_y[j * Ny + tidX] = cuCsub( temp, temp2 );
+            cuDoubleComplex temp2 = cuCmul( d_SysL[mx + j], d_y[( j - 1 ) * Ny + tidX] );
+            temp                  = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
+            temp                  = ComplexScale( temp, coef );
+            d_y[j * Ny + tidX]    = cuCsub( temp, temp2 );
         }
 
-        temp = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[Ny - 1 + mx] );
+        temp = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[mx + ( Ny - 1 )] );
 
         in[( Ny - 1 ) * N + tidX + 1]  = temp.x;
         in2[( Ny - 1 ) * N + tidX + 1] = temp.y;
+#pragma unroll 8
         for ( int j = Ny - 2; j >= 0; j-- ) {
-            temp2 = cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[j + mx], temp ) ), d_SysU[j + mx] );
+            cuDoubleComplex temp2 =
+                cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[mx + j], temp ) ), d_SysU[mx + j] );
             in[j * N + tidX + 1]  = temp2.x;
             in2[j * N + tidX + 1] = temp2.y;
             temp                  = temp2;
@@ -352,8 +352,8 @@ void middle_stuff_DST_wrapper( System                 sys,
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
-    dim3 threadPerBlock { 256 };
-    dim3 blocksPerGrid( numSMs * 20 );
+    int threadPerBlock { 64 };
+    int blocksPerGrid( numSMs );
 
     void *args[] { &N, &Nx, &Ny, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
 
@@ -379,8 +379,8 @@ void middle_stuff_ls_DST_wrapper( System                 sys,
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
-    dim3 threadPerBlock { 256 };
-    dim3 blocksPerGrid( numSMs * 20 );
+    int threadPerBlock { 64 };
+    int blocksPerGrid { (N + threadPerBlock - 1) / threadPerBlock };
 
     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &sys.U, &sys.L, &sys.Up, &d_y, &in, &in2 };
 
