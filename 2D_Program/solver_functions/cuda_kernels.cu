@@ -33,9 +33,8 @@ __global__ void __launch_bounds__( 256 ) load_1st_DST( const int N,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            cuDoubleComplex temp = rhs[tidX + tidY * Nx];
-            in[tidY * N + tidX + 1]  = temp.x;
-            in2[tidY * N + tidX + 1] = temp.y;
+            in[tidY * N + tidX + 1]  = rhs[tidX + tidY * Nx].x;
+            in2[tidY * N + tidX + 1] = rhs[tidX + tidY * Nx].y;
         }
     }
 }
@@ -94,9 +93,8 @@ __global__ void __launch_bounds__( 256 ) load_2st_DST( const int N,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            cuDoubleComplex temp = xhat[tidY + tidX * Ny];
-            in[tidY * N + tidX + 1]  = temp.x;
-            in2[tidY * N + tidX + 1] = temp.y;
+            in[tidY * N + tidX + 1]  = xhat[tidY + tidX * Ny].x;
+            in2[tidY * N + tidX + 1] = xhat[tidY + tidX * Ny].y;
         }
     }
 }
