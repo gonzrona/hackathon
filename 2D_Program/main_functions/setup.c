@@ -1,6 +1,8 @@
 #include "../headers/structs.h"
 #include "../headers/prototypes.h"
 
+#include "../solver_functions/cuda_helper.h"
+
 System defineSystem(int argc, char **argv) {
     
     System sys = userInput();
@@ -19,25 +21,25 @@ System defineSystem(int argc, char **argv) {
         else { sys.order = second; }
         sys.lat.Nx = atoi(argv[2]);
         sys.lat.Ny = sys.lat.Nx;
-        printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
+        // printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
     }
     else if (argc == 2) {
         if (atoi(argv[1]) == 6) { sys.order = sixth; }
         else if (atoi(argv[1]) == 4) { sys.order = fourth; }
         else { sys.order = second; }
-        printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
-        printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
-        printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
+        // printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
+        // printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
+        // printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
     }
     else {
-        int order;
-        printf("Enter Order (2, 4, or 6): "); scanf("%d", &order);
-        if (order == 6) { sys.order = sixth; }
-        else if (order == 4) { sys.order = fourth; }
-        else { sys.order = second; }
-        printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
-        printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
-        printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
+        // int order;
+        // printf("Enter Order (2, 4, or 6): "); scanf("%d", &order);
+        // if (order == 6) { sys.order = sixth; }
+        // else if (order == 4) { sys.order = fourth; }
+        // else { sys.order = second; }
+        // printf("Enter Nx: "); scanf("%d", &sys.lat.Nx);
+        // printf("Enter Ny: "); scanf("%d", &sys.lat.Ny);
+        // printf("Enter number of OMP threads: "); scanf("%d", &sys.threadCount);
     }
     
     if (sys.order == sixth && sys.lat.Nx != sys.lat.Ny) {
@@ -50,6 +52,25 @@ System defineSystem(int argc, char **argv) {
     
     sys.lat.Nxy = sys.lat.Nx * sys.lat.Ny;
 
+#if USE_CUFFTW
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.sol, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.sol_analytic, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.rhs, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.L, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.U, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.Up, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.res, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.error, sys.lat.Nxy * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.k, sys.lat.Nxy * sizeof(double _Complex), 1));
+
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.bp, sys.lat.Ny * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.ap, sys.lat.Ny * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.b, sys.lat.Ny * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.a, sys.lat.Ny * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.bm, sys.lat.Ny * sizeof(double _Complex), 1));
+    CUDA_RT_CALL(cudaMallocManaged((void **)&sys.am, sys.lat.Ny * sizeof(double _Complex), 1));
+
+#else
     sys.sol             = malloc(sys.lat.Nxy * sizeof(double _Complex));
     sys.sol_analytic    = malloc(sys.lat.Nxy * sizeof(double _Complex));
     sys.rhs             = malloc(sys.lat.Nxy * sizeof(double _Complex));
@@ -66,11 +87,30 @@ System defineSystem(int argc, char **argv) {
     sys.a  = malloc(sys.lat.Ny * sizeof(double _Complex));
     sys.bm = malloc(sys.lat.Ny * sizeof(double _Complex));
     sys.am = malloc(sys.lat.Ny * sizeof(double _Complex));
+#endif
 
     return sys;
 }
 
 void clearMemory(System sys) {
+#if USE_CUFFTW
+    CUDA_RT_CALL(cudaFree(sys.sol));
+    CUDA_RT_CALL(cudaFree(sys.sol_analytic));
+    CUDA_RT_CALL(cudaFree(sys.rhs));
+    CUDA_RT_CALL(cudaFree(sys.L));
+    CUDA_RT_CALL(cudaFree(sys.U));
+    CUDA_RT_CALL(cudaFree(sys.Up));
+    CUDA_RT_CALL(cudaFree(sys.res));
+    CUDA_RT_CALL(cudaFree(sys.error));
+    CUDA_RT_CALL(cudaFree(sys.k));
+
+    CUDA_RT_CALL(cudaFree(sys.bp));
+    CUDA_RT_CALL(cudaFree(sys.ap));
+    CUDA_RT_CALL(cudaFree(sys.b));
+    CUDA_RT_CALL(cudaFree(sys.a));
+    CUDA_RT_CALL(cudaFree(sys.bm));
+    CUDA_RT_CALL(cudaFree(sys.am));
+#else
     free(sys.sol); sys.sol = NULL;
     free(sys.sol_analytic); sys.sol_analytic = NULL;
     free(sys.rhs); sys.rhs = NULL;
@@ -87,5 +127,5 @@ void clearMemory(System sys) {
     free(sys.a);  sys.a  = NULL;
     free(sys.bm); sys.bm = NULL;
     free(sys.am); sys.am = NULL;
-
+#endif
 }

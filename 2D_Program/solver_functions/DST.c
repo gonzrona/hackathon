@@ -1,103 +1,111 @@
 #include "../headers/structs.h"
 
-#include <cufftw.h>
 #include "cuda_helper.h"
+#include "cuda_kernels.h"
+#include <cuComplex.h>
+#include <cufftw.h>
 
-void forwardDST(System sys, DSTN dst, double _Complex *rhs, double _Complex *rhat, fftw_plan plan, double *in, fftw_complex *out, fftw_plan plan2, double *in2, fftw_complex *out2) {
- 
-    int i,j,my;
-    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
+#if USE_CUFFTW
+#ifdef USE_COMBINE
+void fullDST( const cudaStream_t *streams,
+              const System        sys,
+              const DSTN          dst,
+              const fftw_plan     plan,
+              const fftw_plan     plan2,
+              cuDoubleComplex *   d_y,
+              double *            in,
+              fftw_complex *      out,
+              double *            in2,
+              fftw_complex *      out2 ) {
 
-#if USE_BATCHED
+    PUSH_RANGE( "forwardDST", 2 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
+    load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
 
-    int N = 2*Nx + 2, NC = (N/2) + 1;
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[1] ) );
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+    POP_RANGE
 
-        for (i=0; i<dst.Nx; i++) { in[(j*N) + i+1] = creal(rhs[i + my]); }
-        for (i=0; i<dst.Nx; i++) { in2[(j*N) + i+1] = cimag(rhs[i + my]); }       
-    }
+    PUSH_RANGE( "forwardDST", 3 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[2] ) );
+    middle_stuff_ls_DST_wrapper( sys, dst, out, out2, in, in2, d_y );
+    POP_RANGE
 
-#if USE_OMP   
-    #pragma omp critical (fftw_execute)
-#endif
-    {
-    fftw_execute(plan); /********************* FFTW *********************/
-    fftw_execute(plan2); /********************* FFTW *********************/
-    }
+    PUSH_RANGE( "forwardDST", 4 )
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
 
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
-
-        for (i=0; i<dst.Nx; i++) { rhat[i + my] = dst.coef * (-cimag(out[(j*NC) + i+1]) - I * cimag(out2[(j*NC) + i+1])); }
-    }
-
-#else
-
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
-
-        for (i=0; i<dst.Nx; i++) { in[i+1] = creal(rhs[i + my]); }
-        for (i=0; i<dst.Nx; i++) { in2[i+1] = cimag(rhs[i + my]); }
-        
-        fftw_execute(plan); /********************* FFTW *********************/
-        fftw_execute(plan2); /********************* FFTW *********************/
-
-        for (i=0; i<dst.Nx; i++) { rhat[i + my] = dst.coef * (-cimag(out[i+1]) - I * cimag(out2[i+1])); }
-    }
-
-#endif
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[3] ) );
+    store_2st_DST_wrapper( sys, dst, out, out2, sys.sol );
+    POP_RANGE
 }
-
-void reverseDST(System sys, DSTN dst, double _Complex *xhat, double _Complex *sol, fftw_plan plan, double *in, fftw_complex *out, fftw_plan plan2, double *in2, fftw_complex *out2) {
- 
-    int i,j,my;
-    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-
-#if USE_BATCHED    
-
-    int N = 2*Nx + 2, NC = (N/2) + 1;
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
-
-        for (i=0; i<dst.Nx; i++) { in[(j*N) + i+1] = creal(xhat[j + i*Ny]); }
-        for (i=0; i<dst.Nx; i++) { in2[(j*N) + i+1] = cimag(xhat[j + i*Ny]); }
-    }
-
-#if USE_OMP   
-    #pragma omp critical (fftw_execute)
-#endif
-    {
-    fftw_execute(plan); /********************* FFTW *********************/
-    fftw_execute(plan2); /********************* FFTW *********************/
-    }
-
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
-
-        for (i=0; i<dst.Nx; i++) { sol[i + my] = dst.coef * (-cimag(out[(j*NC) + i+1]) - I * cimag(out2[(j*NC) + i+1])); }
-        
-    }
-
 #else
+void fullDST( const cudaStream_t *streams,
+              const System        sys,
+              const DSTN          dst,
+              const fftw_plan     plan,
+              const fftw_plan     plan2,
+              cuDoubleComplex *   d_rhat,
+              cuDoubleComplex *   d_xhat,
+              cuDoubleComplex *   d_y,
+              double *            in,
+              fftw_complex *      out,
+              double *            in2,
+              fftw_complex *      out2 ) {
 
-#pragma omp for
-    for(j = 0; j < Ny; j++) {
-        my = j*Nx;
+    PUSH_RANGE( "forwardDST", 2 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
+    load_1st_DST_wrapper( sys, dst, sys.rhs, in, in2 );
 
-        for (i=0; i<dst.Nx; i++) { in[i+1] = creal(xhat[j + i*Ny]); }
-        for (i=0; i<dst.Nx; i++) { in2[i+1] = cimag(xhat[j + i*Ny]); }
-        
-        fftw_execute(plan); /********************* FFTW *********************/
-        fftw_execute(plan2); /********************* FFTW *********************/
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[1] ) );
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+    store_1st_DST_wrapper( sys, dst, out, out2, d_rhat );
+    POP_RANGE
 
-        for (i=0; i<dst.Nx; i++) { sol[i + my] = dst.coef * (-cimag(out[i+1]) - I * cimag(out2[i+1])); }
+    PUSH_RANGE( "forwardDST", 3 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[2] ) );
+    middle_stuff_DST_wrapper( sys, d_rhat, d_xhat, d_y );
+    POP_RANGE
+
+    PUSH_RANGE( "forwardDST", 4 )
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[3] ) );
+    load_2st_DST_wrapper( sys, dst, d_xhat, in, in2 );
+    fftw_execute( plan );  /********************* FFTW *********************/
+    fftw_execute( plan2 ); /********************* FFTW *********************/
+
+    store_2st_DST_wrapper( sys, dst, out, out2, sys.sol );
+    POP_RANGE
+}
+#endif
+#else
+void DST( DSTN dst, double _Complex *b, double _Complex *bhat, fftw_plan plan, double *in, fftw_complex *out ) {
+
+    int i;
+
+    for ( i = 0; i < dst.N; i++ ) {
+        in[i] = 0.0;
     }
 
-#endif
+    for ( i = 0; i < dst.Nx; i++ ) {
+        in[i + 1] = creal( b[i] );
+    }
+
+    fftw_execute( plan );
+
+    for ( i = 0; i < dst.Nx; i++ ) {
+        bhat[i] = -cimag( out[i + 1] );
+    }
+
+    for ( i = 0; i < dst.Nx; i++ ) {
+        in[i + 1] = cimag( b[i] );
+    }
+
+    fftw_execute( plan );
+
+    for ( i = 0; i < dst.Nx; i++ ) {
+        bhat[i] = dst.coef * ( bhat[i] - I * cimag( out[i + 1] ) );
+    }
 }
+#endif
