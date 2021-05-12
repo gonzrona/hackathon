@@ -8,10 +8,15 @@ SRCS = $(wildcard *.c) $(wildcard */*.c)
 OBJS = $(SRCS:.c=.o)
 MAIN = Direct_Solver
 
+ARCHES	:=-gencode arch=compute_70,code=\"compute_70,sm_70\" \
+			-gencode arch=compute_75,code=\"compute_75,sm_75\" \
+			-gencode arch=compute_80,code=\"compute_80,sm_80\"
+
+
 ifneq ($(origin USE_CUFFTW), undefined)
 	ifneq ($(USE_CUFFTW), 0)
 		CFLAGS += -DUSE_CUFFTW
-		LIBS += -lcufft -lcufftw
+		LIBS += -lcufft -lcufftw -lcudart
 	else
 		LIBS += -lfftw3_omp -lfftw3
 	endif
