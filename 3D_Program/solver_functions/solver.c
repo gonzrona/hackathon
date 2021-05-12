@@ -3,6 +3,9 @@
 
 void DST(int Nx, int Ny, double *b_2D, double *bhat, fftw_plan p1,  double *in1, fftw_complex *out1, fftw_plan p2,  double *in2, fftw_complex *out2);
 
+#ifdef USE_CUFFTW
+
+#else
 void solver(System sys) {
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
     int Nxy,Nxz, Nxyz;
@@ -138,3 +141,5 @@ void solver(System sys) {
     
     return;
 }
+
+#endif

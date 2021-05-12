@@ -1,6 +1,9 @@
 #include "../headers/structs.h"
 #include "../headers/prototypes.h"
 
+#ifdef USE_CUFFTW
+
+#else
 void DST(const int Nx, const int Ny, double *b_2D, double *bhat, fftw_plan p1, double *in1, fftw_complex *out1,fftw_plan p2,  double *in2, fftw_complex *out2)
 {
     double coef;
@@ -53,7 +56,4 @@ void DST(const int Nx, const int Ny, double *b_2D, double *bhat, fftw_plan p1, d
     
     return ;
 }
-
-
-
-
+#endif
