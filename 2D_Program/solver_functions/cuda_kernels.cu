@@ -23,8 +23,7 @@ __global__ void __launch_bounds__( 256 ) load_1st_DST( const int N,
                                                        const int Nx,
                                                        const int Ny,
                                                        const cuDoubleComplex *__restrict__ rhs,
-                                                       double *__restrict__ in,
-                                                       double *__restrict__ in2 ) {
+                                                       double *__restrict__ in ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
 
@@ -33,8 +32,8 @@ __global__ void __launch_bounds__( 256 ) load_1st_DST( const int N,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidY * N + tidX + 1]  = rhs[tidX + tidY * Nx].x;
-            in2[tidY * N + tidX + 1] = rhs[tidX + tidY * Nx].y;
+            in[tidY * N + tidX + 1]                  = rhs[tidX + tidY * Nx].x;
+            in[( N * Ny ) + ( tidY * N + tidX + 1 )] = rhs[tidX + tidY * Nx].y;
         }
     }
 }
@@ -54,7 +53,6 @@ __global__ void __launch_bounds__( 256 ) store_1st_DST( const int    N,
                                                         const int    NC,
                                                         const double coef,
                                                         const cuDoubleComplex *__restrict__ out,
-                                                        const cuDoubleComplex *__restrict__ out2,
                                                         cuDoubleComplex *__restrict__ d_rhat ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -65,7 +63,7 @@ __global__ void __launch_bounds__( 256 ) store_1st_DST( const int    N,
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             d_rhat[Nx * tidY + tidX].x = coef * -out[tidY * NC + tidX + 1].y;
-            d_rhat[Nx * tidY + tidX].y = coef * -out2[tidY * NC + tidX + 1].y;
+            d_rhat[Nx * tidY + tidX].y = coef * -out[( NC * Ny ) + ( tidY * NC + tidX + 1 )].y;
         }
     }
 }
@@ -83,8 +81,7 @@ __global__ void __launch_bounds__( 256 ) load_2st_DST( const int N,
                                                        const int Nx,
                                                        const int Ny,
                                                        const cuDoubleComplex *__restrict__ xhat,
-                                                       double *__restrict__ in,
-                                                       double *__restrict__ in2 ) {
+                                                       double *__restrict__ in ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
 
@@ -93,8 +90,8 @@ __global__ void __launch_bounds__( 256 ) load_2st_DST( const int N,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidY * N + tidX + 1]  = xhat[tidY + tidX * Ny].x;
-            in2[tidY * N + tidX + 1] = xhat[tidY + tidX * Ny].y;
+            in[tidY * N + tidX + 1]                  = xhat[tidY + tidX * Ny].x;
+            in[( N * Ny ) + ( tidY * N + tidX + 1 )] = xhat[tidY + tidX * Ny].y;
         }
     }
 }
@@ -114,7 +111,6 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    N,
                                                         const int    NC,
                                                         const double coef,
                                                         const cuDoubleComplex *__restrict__ out,
-                                                        const cuDoubleComplex *__restrict__ out2,
                                                         cuDoubleComplex *__restrict__ d_sol ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -125,7 +121,7 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    N,
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             d_sol[Nx * tidY + tidX].x = coef * -out[tidY * NC + tidX + 1].y;
-            d_sol[Nx * tidY + tidX].y = coef * -out2[tidY * NC + tidX + 1].y;
+            d_sol[Nx * tidY + tidX].y = coef * -out[( NC * Ny ) + ( tidY * NC + tidX + 1 )].y;
         }
     }
 }
@@ -211,13 +207,11 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
                                                              const int    NC,
                                                              const double coef,
                                                              const cuDoubleComplex *__restrict__ out,
-                                                             const cuDoubleComplex *__restrict__ out2,
                                                              const cuDoubleComplex *__restrict__ d_SysU,
                                                              const cuDoubleComplex *__restrict__ d_SysL,
                                                              const cuDoubleComplex *__restrict__ d_SysUp,
                                                              cuDoubleComplex *__restrict__ d_y,
-                                                             double *__restrict__ in,
-                                                             double *__restrict__ in2 ) {
+                                                             double *__restrict__ in ) {
 
     const int tidX { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
 
@@ -226,29 +220,29 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
     if ( tidX < Nx ) {
         int mx = Ny * tidX;
 
-        temp      = make_cuDoubleComplex( -out[tidX + 1].y, -out2[tidX + 1].y );
+        temp      = make_cuDoubleComplex( -out[tidX + 1].y, -out[( NC * Ny ) + tidX + 1].y );
         temp      = ComplexScale( temp, coef );
         d_y[tidX] = temp;
 
 #pragma unroll 8
         for ( int j = 1; j < Ny; j++ ) {
             cuDoubleComplex temp2 = cuCmul( d_SysL[mx + j], d_y[( j - 1 ) * Ny + tidX] );
-            temp                  = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out2[j * NC + tidX + 1].y );
-            temp                  = ComplexScale( temp, coef );
-            d_y[j * Ny + tidX]    = cuCsub( temp, temp2 );
+            temp = make_cuDoubleComplex( -out[j * NC + tidX + 1].y, -out[( NC * Ny ) + ( j * NC + tidX + 1 )].y );
+            temp = ComplexScale( temp, coef );
+            d_y[j * Ny + tidX] = cuCsub( temp, temp2 );
         }
 
         temp = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[mx + ( Ny - 1 )] );
 
-        in[( Ny - 1 ) * N + tidX + 1]  = temp.x;
-        in2[( Ny - 1 ) * N + tidX + 1] = temp.y;
+        in[( Ny - 1 ) * N + tidX + 1]                  = temp.x;
+        in[( N * Ny ) + ( ( Ny - 1 ) * N + tidX + 1 )] = temp.y;
 #pragma unroll 4
         for ( int j = Ny - 2; j >= 0; j-- ) {
             cuDoubleComplex temp2 =
                 cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[mx + j], temp ) ), d_SysU[mx + j] );
-            in[j * N + tidX + 1]  = temp2.x;
-            in2[j * N + tidX + 1] = temp2.y;
-            temp                  = temp2;
+            in[j * N + tidX + 1]                  = temp2.x;
+            in[( N * Ny ) + ( j * N + tidX + 1 )] = temp2.y;
+            temp                                  = temp2;
         }
     }
 }
@@ -257,8 +251,7 @@ void load_1st_DST_wrapper( const cudaStream_t     stream,
                            const System           sys,
                            const DSTN             dst,
                            const cuDoubleComplex *d_rhs,
-                           double *               in,
-                           double *               in2 ) {
+                           double *               in ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2;
@@ -269,7 +262,7 @@ void load_1st_DST_wrapper( const cudaStream_t     stream,
     dim3 threadPerBlock { 16, 16 };
     dim3 blocksPerGrid( numSMs, numSMs );
 
-    void *args[] { &N, &Nx, &Ny, &d_rhs, &in, &in2 };
+    void *args[] { &N, &Nx, &Ny, &d_rhs, &in };
 
     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
@@ -280,7 +273,6 @@ void store_1st_DST_wrapper( const cudaStream_t     stream,
                             const System           sys,
                             const DSTN             dst,
                             const cuDoubleComplex *out,
-                            const cuDoubleComplex *out2,
                             cuDoubleComplex *      d_rhat ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
@@ -294,7 +286,7 @@ void store_1st_DST_wrapper( const cudaStream_t     stream,
 
     double coef = dst.coef;
 
-    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_rhat };
+    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &d_rhat };
 
     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
@@ -305,8 +297,7 @@ void load_2st_DST_wrapper( const cudaStream_t     stream,
                            const System           sys,
                            const DSTN             dst,
                            const cuDoubleComplex *d_xhat,
-                           double *               in,
-                           double *               in2 ) {
+                           double *               in ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2;
@@ -317,7 +308,7 @@ void load_2st_DST_wrapper( const cudaStream_t     stream,
     dim3 threadPerBlock { 16, 16 };
     dim3 blocksPerGrid( numSMs, numSMs );
 
-    void *args[] { &N, &Nx, &Ny, &d_xhat, &in, &in2 };
+    void *args[] { &N, &Nx, &Ny, &d_xhat, &in };
 
     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
@@ -328,7 +319,6 @@ void store_2st_DST_wrapper( const cudaStream_t     stream,
                             const System           sys,
                             const DSTN             dst,
                             const cuDoubleComplex *out,
-                            const cuDoubleComplex *out2,
                             cuDoubleComplex *      d_sol ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
@@ -342,7 +332,7 @@ void store_2st_DST_wrapper( const cudaStream_t     stream,
 
     double coef = dst.coef;
 
-    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &d_sol };
+    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &d_sol };
 
     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
@@ -375,9 +365,7 @@ void middle_stuff_ls_DST_wrapper( const cudaStream_t     stream,
                                   System                 sys,
                                   const DSTN             dst,
                                   const cuDoubleComplex *out,
-                                  const cuDoubleComplex *out2,
                                   double *               in,
-                                  double *               in2,
                                   cuDoubleComplex *      d_y ) {
 
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
@@ -391,7 +379,7 @@ void middle_stuff_ls_DST_wrapper( const cudaStream_t     stream,
     int threadPerBlock { 64 };
     int blocksPerGrid { ( N + threadPerBlock - 1 ) / threadPerBlock };
 
-    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &out2, &sys.U, &sys.L, &sys.Up, &d_y, &in, &in2 };
+    void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &sys.U, &sys.L, &sys.Up, &d_y, &in };
 
     CUDA_RT_CALL(
         cudaLaunchKernel( ( void * )( &middle_stuff_ls_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
