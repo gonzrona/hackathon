@@ -1,6 +1,4 @@
-#include <complex.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include "../headers/structs.h"
 #define INDEX(i,j,l,Nx,Ny) i+j*Nx+l*Nx*Ny
 
 
@@ -38,8 +36,16 @@
  Dr. Yury Gryazin, Ronald Gonzales, Yun Teck Lee 06/12/2018, ISU, Pocatello, ID
  */
 
-void residual3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,
-                double complex *SOL, double complex *res,double complex *rhs,double complex *a, double complex *b, double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm, double *k2_bg_ext){
+//void residual3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,
+//                double complex *SOL, double complex *res,double complex *rhs,double complex *a, double complex *b, double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm, double *k2_bg_ext){
+    
+void residual(System sys) {
+    
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
+    double complex *a = sys.a, *b = sys.b, *c = sys.c, *d = sys.d;
+    double complex *am = sys.am, *bm = sys.bm, *cm = sys.cm, *dm = sys.dm;
+    double complex *ap = sys.ap, *bp = sys.bp, *cp = sys.cp, *dp = sys.dp;
+    double complex *rhs = sys.rhs, *res = sys.res;
     
     int i,j,l,Nxy;
     Nxy = Nx*Ny;
@@ -54,7 +60,7 @@ void residual3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,
     for(i = 0; i<Nx; i++){
         for(j = 0; j< Ny;j++){
             for(l=0; l<Nz;l++){
-                ext_SOL[i+1+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] = SOL[i+j*Nx+l*Nxy];
+                ext_SOL[i+1+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] = sys.sol[i+j*Nx+l*Nxy];
             }
         }
     }
@@ -79,6 +85,9 @@ void residual3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,
     for(i=0; i<(Nx)*(Ny)*(Nz);i++){
         res[i] = res[i] - rhs[i];
     }
+    
+    for (i=0; i<sys.lat.Nxyz; i++) { sys.error[i] = sys.sol[i] - sys.sol_analytic[i]; }
+    
     
     free(ext_SOL);
     ext_SOL = NULL;

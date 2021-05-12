@@ -1,34 +1,10 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <complex.h>
-#include <math.h>
-#include <time.h>
-#include <fftw3.h>
+#include "../headers/structs.h"
+#include "../headers/prototypes.h"
 
-/*
- Transform the right hand side with FFT, solve the tridiagonal system with LU and transform the solution with FFT
- ========================================================================
- general important input:
- rhs      - an Nx*Ny*Nz right hand side vector
- Nx,Ny,Nz - the number of grid points in x-,y- and z-directions.
- DL       - the subdiagonal in the L matrix from the LU factorization of the transformed tridiagonal matrix.
- UL       - the main diagonal in the U matrix from the LU factorization of the transformed tridiagonal matrix.
- output:
- SOL      - is the solution of Ax=rhs
- 
- ========================================================================
- 
- NOTE:
- No user input required here; No changes should be made to this code.
- 
- Dr. Yury Gryazin, Ronald Gonzales, Yun Teck Lee 06/12/2018, ISU, Pocatello, ID
- */
+void DST(int Nx, int Ny, double *b_2D, double *bhat, fftw_plan p1,  double *in1, fftw_complex *out1, fftw_plan p2,  double *in2, fftw_complex *out2);
 
-
-void myDST_2D(int Nx, int Ny, double *b_2D, double *bhat, fftw_plan p1,  double *in1, fftw_complex *out1, fftw_plan p2,  double *in2, fftw_complex *out2);
-
-void solver_3D_dir_Z_DDD(int Nx, int Ny, int Nz, double complex *SOL, double complex *DL,double complex *DU, double complex *DC, double complex *rhs )
-{
+void solver(System sys) {
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
     int Nxy,Nxz, Nxyz;
     double complex *rhat, *y_a, *xhat;
     /*
@@ -99,12 +75,12 @@ void solver_3D_dir_Z_DDD(int Nx, int Ny, int Nz, double complex *SOL, double com
 
     for(l = 0; l < Nz; l++) {
         for(i = 0; i < Nxy; i++) {
-            b_2D_r[i] = creal(rhs[i + l*Nxy]) ;
-            b_2D_i[i] = cimag(rhs[i + l*Nxy]) ;
+            b_2D_r[i] = creal(sys.rhs[i + l*Nxy]) ;
+            b_2D_i[i] = cimag(sys.rhs[i + l*Nxy]) ;
         }
         
-        myDST_2D(Nx, Ny, b_2D_r, bhat_r, p1, in1, out1, p2, in2, out2);
-        myDST_2D(Nx, Ny, b_2D_i, bhat_i, p1, in1, out1, p2, in2, out2);
+        DST(Nx, Ny, b_2D_r, bhat_r, p1, in1, out1, p2, in2, out2);
+        DST(Nx, Ny, b_2D_i, bhat_i, p1, in1, out1, p2, in2, out2);
 
         for(i = 0; i < Nxy; i++) {
             rhat[i + l*Nxy] = bhat_r[i] + I*bhat_i[i] ;
@@ -119,11 +95,11 @@ void solver_3D_dir_Z_DDD(int Nx, int Ny, int Nz, double complex *SOL, double com
         for( i = 0; i < Nx; i++){
             y_a[0] = rhat[i + j*Nx] ;
             for( l = 1; l < Nz; l++) {
-                y_a[l] = rhat[i + j*Nx + l*Nxy] - DL[l + i*Nz + j*Nxz]*y_a[l - 1] ;
+                y_a[l] = rhat[i + j*Nx + l*Nxy] - sys.L[l + i*Nz + j*Nxz]*y_a[l - 1] ;
             }
-            xhat[Nz - 1 + i*Nz + j*Nxz] = y_a[Nz - 1]*DU[Nz - 1 + i*Nz + j*Nxz] ;
+            xhat[Nz - 1 + i*Nz + j*Nxz] = y_a[Nz - 1]*sys.U[Nz - 1 + i*Nz + j*Nxz] ;
             for( l = Nz-2; l >= 0 ; l--) {
-                xhat[l + i*Nz + j*Nxz] = ( y_a[l] - DC[l + i*Nz + j*Nxz]*xhat[l + 1 + i*Nz + j*Nxz] )*DU[l + i*Nz + j*Nxz];
+                xhat[l + i*Nz + j*Nxz] = ( y_a[l] - sys.Up[l + i*Nz + j*Nxz]*xhat[l + 1 + i*Nz + j*Nxz] )*sys.U[l + i*Nz + j*Nxz];
             }
         }
     }
@@ -139,11 +115,11 @@ void solver_3D_dir_Z_DDD(int Nx, int Ny, int Nz, double complex *SOL, double com
             b_2D_i[i] = cimag(xhat[l + i*Nz]) ;
         }
         
-        myDST_2D(Nx, Ny, b_2D_r, bhat_r, p1, in1, out1, p2, in2, out2);
-        myDST_2D(Nx, Ny, b_2D_i, bhat_i, p1, in1, out1, p2, in2, out2);
+        DST(Nx, Ny, b_2D_r, bhat_r, p1, in1, out1, p2, in2, out2);
+        DST(Nx, Ny, b_2D_i, bhat_i, p1, in1, out1, p2, in2, out2);
 
         for(i = 0; i < Nxy; i++) {
-            SOL[i + l*Nxy] = bhat_r[i] + I*bhat_i[i] ;
+            sys.sol[i + l*Nxy] = bhat_r[i] + I*bhat_i[i] ;
         }
     }
     
@@ -162,5 +138,3 @@ void solver_3D_dir_Z_DDD(int Nx, int Ny, int Nz, double complex *SOL, double com
     
     return;
 }
-
-

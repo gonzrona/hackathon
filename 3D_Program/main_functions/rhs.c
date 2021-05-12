@@ -1,53 +1,5 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <complex.h>
-#include <math.h>
-/* #define M_PI acos(-1.0) */
-
-/*
- Find the exact solution and the right hand side of the 3D helmholtz equation based on the order user desire
- ========================================================================
- general important input:
- order - the order of approximation of your scheme: 2, 4 or 6.
- Nx,Ny,Nz - the number of grid points.
- hx,hy,hz - the grid steps.
- x0,x1,y0,y1,z0,z1 - the coordinates of the computational domain.
- k_bg_ext - k_bg_ext distribution in the background media.
- k2_bg_ext - k_bg_ext^2 distribution in the background media.
- a - coefficient of the corners on the l-level (current level)
- b - coefficient of the points differing in y on the l-level
- c - coefficient of the points differing in x on the l-level
- d - coefficient of the center points differing on the l-level
- ap - coefficient of the corners on the (l+1)-level (top level)
- bp - coefficient of the points differing in y on the (l+1)-level
- cp - coefficient of the points differing in x on the (l+1)-level
- dp - coefficient of the center points differing on the (l+1)-level
- am - coefficient of the corners on the (l-1)-level (bottom level)
- bm - coefficient of the points differing in y on the (l-1)-level
- cm - coefficient of the points differing in x on the (l-1)-level
- dm - coefficient of the center points differing on the (l-1)-level
- A,B,C,beta,gamma - the parameter used for the test problem
- 
- 
- output:
- rhs - right hand side of the 3D helmholtz equation
- UE - the exact solution to the 3D helmholtz equation
- 
- ========================================================================
- 
- NOTE:
- User may modified the exact solution and right hand side as they desired.
- In this code we will be using UE(x,y,z) = sin(gamma*x)*sin(beta*y)*exp(-k(z)/C) as our exact solution
- and by doing so our right hand side becomes rhs(x,y,z) = -1.0*B*(2.0*A+C)*sin(C*z)*UE_ext(x,y,z)
- 
- If the user decided to change the exact solution the following function would require changes as well:
- 1) second_test3D_6th
- 
- IMPORTANT: The user should made sure that the right hand side will satisfy the boundary condition impose on this code which
- is UE(0,y,z) = UE(x,0,z) = 0
- 
- Dr. Yury Gryazin, Ronald Gonzales, Yun Teck Lee 06/12/2018, ISU, Pocatello, ID
- */
+#include "../headers/structs.h"
+#include "../headers/prototypes.h"
 
 void derivative_xx_2nd_order(int Nx, int Ny, int Nz, double hx, double complex *f, double complex *fxx);
 void derivative_yy_2nd_order(int Nx, int Ny, int Nz, double hy, double complex *f, double complex *fyy);
@@ -58,28 +10,28 @@ void derivative_zz_4th_order(int Nx, int Ny, int Nz, double hz, double complex *
 void derivative_kz_4th_order(int Nz, double hz, double complex *k, double complex *kz,double A,double B,double C,double z0, double z1);
 
 
-void second_test3D_2nd(int Nx, int Ny, int Nz, double complex *rhs, double complex *rhs_ext, double complex *UE_ext){
+void second_order_rhs(int Nx, int Ny, int Nz, double complex *rhsl, double complex *rhs_ext, double complex *UE_ext){
 
     int i,j,l;
     for( i = 0; i < Nx; i++) {
         for( j = 0; j < Ny; j++){
             for( l = 0; l < Nz; l++){
-                rhs[i + j*Nx + l* Nx*Ny]  = rhs_ext[i+1 + (j+1)*(Nx+2) + (l+1)*(Nx+2)*(Ny+2)];
+                rhsl[i + j*Nx + l* Nx*Ny]  = rhs_ext[i+1 + (j+1)*(Nx+2) + (l+1)*(Nx+2)*(Ny+2)];
             }
         }
     }
     
     for( i = 0; i < Nx; i++) {
         for( j = 0; j < Ny; j++){
-            rhs[i + j*Nx]  = rhs[i + j*Nx] - UE_ext[i+1 + (j+1)*(Nx+2)];
-            rhs[i + j*Nx + (Nz-1)* Nx*Ny]  = rhs[i + j*Nx + (Nz-1)* Nx*Ny] - UE_ext[i+1 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)];
+            rhsl[i + j*Nx]  = rhsl[i + j*Nx] - UE_ext[i+1 + (j+1)*(Nx+2)];
+            rhsl[i + j*Nx + (Nz-1)* Nx*Ny]  = rhsl[i + j*Nx + (Nz-1)* Nx*Ny] - UE_ext[i+1 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)];
         }
     }
     
     return;
 }
 
-void second_test3D_4th(int Nx, int Ny, int Nz, double complex *rhs,double complex *rhs_ext, double complex *UE_ext, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm)
+void fourth_order_rhs(int Nx, int Ny, int Nz, double complex *rhsl,double complex *rhs_ext, double complex *UE_ext, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm)
 {
     
     int i,j,l;
@@ -87,7 +39,7 @@ void second_test3D_4th(int Nx, int Ny, int Nz, double complex *rhs,double comple
     for( l = 0; l < Nz; l++) {
         for( j = 0; j < Ny; j++){
             for( i = 0; i < Nx; i++){
-                rhs[i + j*Nx + l*Nx*Ny] = rhs_ext[i+1 + (j+1)*(Nx+2) + (l+1)*(Nx+2)*(Ny+2)];
+                rhsl[i + j*Nx + l*Nx*Ny] = rhs_ext[i+1 + (j+1)*(Nx+2) + (l+1)*(Nx+2)*(Ny+2)];
             }
         }
     }
@@ -95,32 +47,32 @@ void second_test3D_4th(int Nx, int Ny, int Nz, double complex *rhs,double comple
     for( l = 0; l < Nz; l++) {
         for( j = 0; j < Ny; j++){
             for( i = 0; i < Nx; i++){
-                rhs[i + j*Nx + l*Nx*Ny] = rhs[i + j*Nx + l*Nx*Ny] + (1.0/12.0)*(rhs_ext[i+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ rhs_ext[i+2+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j+2)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j+1)*(Nx+2)+l*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j+1)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)] -6*rhs_ext[i+1+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]);
+                rhsl[i + j*Nx + l*Nx*Ny] = rhsl[i + j*Nx + l*Nx*Ny] + (1.0/12.0)*(rhs_ext[i+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ rhs_ext[i+2+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j+2)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j+1)*(Nx+2)+l*(Nx+2)*(Ny+2)] + rhs_ext[i+1+(j+1)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)] -6*rhs_ext[i+1+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]);
             }
         }
     }
     
     for( i = 0; i < Nx; i++) {
         for( j = 0; j < Ny; j++){
-            rhs[i + j*Nx]  = rhs[i + j*Nx] - am[0]*(UE_ext[i + j*(Nx+2)]+UE_ext[i+2 + j*(Nx+2)] + UE_ext[i + (j+2)*(Nx+2)] + UE_ext[i+2 + (j+2)*(Nx+2)]) - bm[0]*(UE_ext[i + (j+1)*(Nx+2)]+UE_ext[i+2 + (j+1)*(Nx+2)]) - cm[0]*(UE_ext[i+1 + j*(Nx+2)] + UE_ext[i+1 + (j+2)*(Nx+2)]) - dm[0]*UE_ext[i+1 + (j+1)*(Nx+2)];
+            rhsl[i + j*Nx]  = rhsl[i + j*Nx] - am[0]*(UE_ext[i + j*(Nx+2)]+UE_ext[i+2 + j*(Nx+2)] + UE_ext[i + (j+2)*(Nx+2)] + UE_ext[i+2 + (j+2)*(Nx+2)]) - bm[0]*(UE_ext[i + (j+1)*(Nx+2)]+UE_ext[i+2 + (j+1)*(Nx+2)]) - cm[0]*(UE_ext[i+1 + j*(Nx+2)] + UE_ext[i+1 + (j+2)*(Nx+2)]) - dm[0]*UE_ext[i+1 + (j+1)*(Nx+2)];
             
             
-            rhs[i + j*Nx + (Nz-1)*Nx*Ny]  = rhs[i + j*Nx + (Nz-1)*Nx*Ny] - ap[Nz-1]*(UE_ext[i + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - bp[Nz-1]*(UE_ext[i + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+2 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - cp[Nz-1]*(UE_ext[i+1 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+1 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - dp[Nz-1]*UE_ext[i+1 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)];
+            rhsl[i + j*Nx + (Nz-1)*Nx*Ny]  = rhsl[i + j*Nx + (Nz-1)*Nx*Ny] - ap[Nz-1]*(UE_ext[i + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - bp[Nz-1]*(UE_ext[i + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+2 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - cp[Nz-1]*(UE_ext[i+1 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+1 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - dp[Nz-1]*UE_ext[i+1 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)];
         }
     }
     return;
     
 }
 
-void second_test3D_6th(int Nx, int Ny, int Nz, double hx, double hy, double hz, double x0, double y0, double z0, double z1,double complex *k_bg_ext, double complex *k2_bg_ext, double complex *rhs, double complex *rhs_ext, double complex *UE_ext,double A, double B, double C, double beta, double gamma, double complex *a, double complex *b, double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm)
+void sixth_order_rhs(int Nx, int Ny, int Nz, double hx, double hy, double hz, double x0, double y0, double z0, double z1,double complex *k_bg_ext, double complex *k2_bg_ext, double complex *rhsl, double complex *rhs_ext, double complex *UE_ext,double A, double B, double C, double beta, double gamma, double complex *a, double complex *b, double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm)
 {
     int i,j,l;
   
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /////////// USER INPUT required : If the user change the exact solution they need to update the 
+    /////////// USER INPUT required : If the user change the exact solution they need to update the
     ///////////                       the boundary value of second derivative of right hand side accordingly
-    /////////// Input needed: 
+    /////////// Input needed:
     /////////// truefxx_ext - the boundary value of second derivative of right hand side in x-direction
     /////////// truefyy_ext - the boundary value of second derivative of right hand side in y-direction
     /////////// truefzz_ext - the boundary value of second derivative of right hand side in z-direction
@@ -158,7 +110,7 @@ void second_test3D_6th(int Nx, int Ny, int Nz, double hx, double hy, double hz, 
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /////////// END OF USER INPUT required 
+    /////////// END OF USER INPUT required
     /////////// No further changes should be made beyond this point
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,16 +160,16 @@ void second_test3D_6th(int Nx, int Ny, int Nz, double hx, double hy, double hz, 
                 
                 fifth = (hz*hz*hz/120.0)*k_prime[l]*(rhs_ext[(i+1)+(j+1)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)] - rhs_ext[(i+1)+(j+1)*(Nx+2)+l*(Nx+2)*(Ny+2)]);
                 
-                rhs[i+j*Nx+l*Nx*Ny] = (first+second+third+fourth+fifth);
+                rhsl[i+j*Nx+l*Nx*Ny] = (first+second+third+fourth+fifth);
             }
         }
     }
     for( i = 0; i < Nx; i++) {
         for( j = 0; j < Ny; j++){
-            rhs[i + j*Nx]  = rhs[i + j*Nx] - am[0]*(UE_ext[i + j*(Nx+2)]+UE_ext[i+2 + j*(Nx+2)] + UE_ext[i + (j+2)*(Nx+2)] + UE_ext[i+2 + (j+2)*(Nx+2)]) - bm[0]*(UE_ext[i + (j+1)*(Nx+2)]+UE_ext[i+2 + (j+1)*(Nx+2)]) - cm[0]*(UE_ext[i+1 + j*(Nx+2)] + UE_ext[i+1 + (j+2)*(Nx+2)]) - dm[0]*UE_ext[i+1 + (j+1)*(Nx+2)];
+            rhsl[i + j*Nx]  = rhsl[i + j*Nx] - am[0]*(UE_ext[i + j*(Nx+2)]+UE_ext[i+2 + j*(Nx+2)] + UE_ext[i + (j+2)*(Nx+2)] + UE_ext[i+2 + (j+2)*(Nx+2)]) - bm[0]*(UE_ext[i + (j+1)*(Nx+2)]+UE_ext[i+2 + (j+1)*(Nx+2)]) - cm[0]*(UE_ext[i+1 + j*(Nx+2)] + UE_ext[i+1 + (j+2)*(Nx+2)]) - dm[0]*UE_ext[i+1 + (j+1)*(Nx+2)];
             
             
-            rhs[i + j*Nx + (Nz-1)*Nx*Ny]  = rhs[i + j*Nx + (Nz-1)*Nx*Ny] - ap[Nz-1]*(UE_ext[i + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - bp[Nz-1]*(UE_ext[i + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+2 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - cp[Nz-1]*(UE_ext[i+1 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+1 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - dp[Nz-1]*UE_ext[i+1 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)];
+            rhsl[i + j*Nx + (Nz-1)*Nx*Ny]  = rhsl[i + j*Nx + (Nz-1)*Nx*Ny] - ap[Nz-1]*(UE_ext[i + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)] + UE_ext[i+2 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - bp[Nz-1]*(UE_ext[i + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+2 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - cp[Nz-1]*(UE_ext[i+1 + j*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]+UE_ext[i+1 + (j+2)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)]) - dp[Nz-1]*UE_ext[i+1 + (j+1)*(Nx+2) + (Nz+1)*(Nx+2)*(Ny+2)];
         }
     }
     
@@ -241,9 +193,22 @@ void second_test3D_6th(int Nx, int Ny, int Nz, double hx, double hy, double hz, 
     return;
 }
 
-void second_test3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,double x0, double y0, double z0, double z1,double complex *k_bg_ext,double complex *k2_bg_ext, double complex *rhs,double complex *UE, int order,double A,double B,double C,double beta,double gamma, double complex *a, double complex *b, double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm)
-{
+
+
+void rhs(System sys) {
+    
     int i,j,l;
+    
+    int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
+    double x0 = sys.lat.x0, y0 = sys.lat.y0, z0 = sys.lat.z0, z1 = sys.lat.z1;
+    double hx = sys.lat.hx, hy = sys.lat.hy, hz = sys.lat.hz;
+    double complex *a = sys.a, *b = sys.b, *c = sys.c, *d = sys.d;
+    double complex *am = sys.am, *bm = sys.bm, *cm = sys.cm, *dm = sys.dm;
+    double complex *ap = sys.ap, *bp = sys.bp, *cp = sys.cp, *dp = sys.dp;
+    double complex *k_bg_ext = sys.k_bg_ext, *k2_bg_ext = sys.k2_bg_ext;
+    double beta = sys.beta, gamma = sys.gamma;
+    double A = sys.A, B = sys.B, C = sys.C;
+//    double complex *UE = sys.UE;
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,7 +253,7 @@ void second_test3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,doubl
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /////////// END OF USER INPUT required 
+    /////////// END OF USER INPUT required
     /////////// No further changes should be made beyond this point
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -296,25 +261,24 @@ void second_test3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,doubl
     for( i = 0; i < Nx; i++) {
         for( j = 0; j < Ny; j++){
             for( l = 0; l < Nz; l++){
-                UE[i + j*Nx + l*Nx*Ny]  = UE_ext[i+1 + (j+1)*(Nx+2) + (l+1)*(Nx+2)*(Ny+2)];
+                sys.sol_analytic[i + j*Nx + l*Nx*Ny]  = UE_ext[i+1 + (j+1)*(Nx+2) + (l+1)*(Nx+2)*(Ny+2)];
             }
         }
     }
     
     
     
-    switch (order) {
-        case 2:
-            second_test3D_2nd(Nx,Ny,Nz,rhs,rhs_ext,UE_ext);
-            break;
-        case 4:
-            second_test3D_4th(Nx,Ny,Nz,rhs,rhs_ext,UE_ext, ap, bp, cp, dp, am, bm, cm, dm);
-            break;
-        case 6:
-            second_test3D_6th(Nx,Ny,Nz,hx,hy,hz,x0,y0,z0,z1,k_bg_ext,k2_bg_ext,rhs,rhs_ext,UE_ext,A,B,C,beta,gamma, a, b, c, d, ap, bp, cp, dp, am, bm, cm, dm);
-            break;
-        default:
-            break;
+    if (sys.order == sixth) {
+//        sixth_order_rhs(sys);
+        sixth_order_rhs(Nx,Ny,Nz,hx,hy,hz,x0,y0,z0,z1,k_bg_ext,k2_bg_ext,sys.rhs,rhs_ext,UE_ext,A,B,C,beta,gamma, a, b, c, d, ap, bp, cp, dp, am, bm, cm, dm);
+    }
+    else if (sys.order == fourth) {
+//        fourth_order_rhs(sys);
+        fourth_order_rhs(Nx,Ny,Nz,sys.rhs,rhs_ext,UE_ext, ap, bp, cp, dp, am, bm, cm, dm);
+    }
+    else {
+//        second_order_rhs(sys);
+        second_order_rhs(Nx,Ny,Nz,sys.rhs,rhs_ext,UE_ext);
     }
 
     free(fix);
@@ -328,11 +292,6 @@ void second_test3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,doubl
     free(rhs_ext);
     rhs_ext = NULL;
 }
-
-
-
-
-
 
 
 
