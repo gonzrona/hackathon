@@ -1,4 +1,4 @@
-CC = gcc-10
+CC = gcc
 CFLAGS = -Wall -g -fopenmp -O0
 INCLUDES = -I/usr/local/include
 LFLAGS = -L/usr/local/lib
