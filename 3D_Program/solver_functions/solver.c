@@ -14,9 +14,10 @@
 
 #ifdef USE_CUFFTW
 
-void DST1( const int l,
-           const int Nx,
-           const int Ny,
+void DST1( const cudaStream_t *streams,
+           const int           l,
+           const int           Nx,
+           const int           Ny,
            double complex * rhs,
            cuDoubleComplex *rhat,
            cufftHandle      p1,
@@ -26,10 +27,11 @@ void DST1( const int l,
            double *         in2,
            cuDoubleComplex *out2 );
 
-void DST2( const int l,
-           const int Nx,
-           const int Ny,
-           const int Nz,
+void DST2( const cudaStream_t *streams,
+           const int           l,
+           const int           Nx,
+           const int           Ny,
+           const int           Nz,
            double complex * xhat,
            cuDoubleComplex *sol,
            cufftHandle      p1,
@@ -52,25 +54,25 @@ void DST( int              Nx,
 
 void solver( System sys ) {
 
-    // PUSH_RANGE( "stream creation", 0 )
-    // int          num_streams = 5;
-    // cudaStream_t streams[num_streams];
-    // for ( int i = 0; i < num_streams; i++ ) {
-    //     CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
-    // }
-    // POP_RANGE
+    PUSH_RANGE( "solver", 0 )
 
-    // PUSH_RANGE( "stream creation", 0 )
-    // int         num_events = 5;
-    // cudaEvent_t events[num_events];
-    // for ( int i = 0; i < num_events; i++ ) {
-    //     CUDA_RT_CALL( cudaEventCreateWithFlags( &events[i], cudaEventDisableTiming ) );
-    // }
-    // POP_RANGE
+    PUSH_RANGE( "stream creation", 0 )
+    int          num_streams = 5;
+    cudaStream_t streams[num_streams];
+    for ( int i = 0; i < num_streams; i++ ) {
+        CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
+    }
+    POP_RANGE
 
-    PUSH_RANGE("solver", 0)
+    PUSH_RANGE( "stream creation", 0 )
+    int         num_events = 5;
+    cudaEvent_t events[num_events];
+    for ( int i = 0; i < num_events; i++ ) {
+        CUDA_RT_CALL( cudaEventCreateWithFlags( &events[i], cudaEventDisableTiming ) );
+    }
+    POP_RANGE
 
-    PUSH_RANGE("setup", 1)
+    PUSH_RANGE( "setup", 1 )
 
     int    Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
     int    Nxy, Nxz, Nxyz;
@@ -84,9 +86,9 @@ void solver( System sys ) {
     Nxz  = Nx * Nz;
     Nxyz = Nx * Ny * Nz;
 
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &rhat ), sizeof( double complex ) * Nxyz, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nxyz, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &xhat ), sizeof( double complex ) * Nxyz, 1 ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &rhat ), sizeof( double complex ) * Nxyz ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &y_a ), sizeof( double complex ) * Nxyz ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &xhat ), sizeof( double complex ) * Nxyz ) );
 
     /*
      FFT transformation of the rhs layer by layer (z = const).
@@ -115,10 +117,12 @@ void solver( System sys ) {
     size_t size_in1  = ( sizeof( double ) * NR * m ) * 2;
     size_t size_out1 = ( sizeof( cuDoubleComplex ) * NC * m ) * 2;
 
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in1, size_in1, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out1, size_out1, 1 ) );
+    PUSH_RANGE( "Create p1", 6 )
+    CUDA_RT_CALL( cudaMalloc( ( void ** )&in1, size_in1 ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )&out1, size_out1 ) );
 
     CUDA_RT_CALL( cufftCreate( &p1 ) );
+    CUDA_RT_CALL( cufftSetStream( p1, streams[0] ) );
     CUDA_RT_CALL( cufftMakePlanMany( p1,
                                      rank1,
                                      nr1,
@@ -132,8 +136,9 @@ void solver( System sys ) {
                                      ( howmany1 * 2 ),
                                      &workspace ) );
 
-    CUDA_RT_CALL( cudaMemsetAsync( in1, size_in1, 0, NULL ) );
-    CUDA_RT_CALL( cudaMemsetAsync( out1, size_out1, 0, NULL ) );
+    CUDA_RT_CALL( cudaMemsetAsync( in1, size_in1, 0, streams[0] ) );
+    CUDA_RT_CALL( cudaMemsetAsync( out1, size_out1, 0, streams[0] ) );
+    POP_RANGE
 
     m                  = Nx;
     NR                 = 2 * Ny + 2;
@@ -150,10 +155,12 @@ void solver( System sys ) {
     size_t size_in2  = ( sizeof( double ) * NR * m ) * 2;
     size_t size_out2 = ( sizeof( cuDoubleComplex ) * NC * m ) * 2;
 
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &in2 ), size_in2, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &out2 ), size_out2, 1 ) );
+    PUSH_RANGE( "Create p2", 7 )
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &in2 ), size_in2 ) );
+    CUDA_RT_CALL( cudaMalloc( ( void ** )( &out2 ), size_out2 ) );
 
     CUDA_RT_CALL( cufftCreate( &p2 ) );
+    CUDA_RT_CALL( cufftSetStream( p2, streams[0] ) );
     CUDA_RT_CALL( cufftMakePlanMany( p2,
                                      rank2,
                                      nr2,
@@ -167,14 +174,27 @@ void solver( System sys ) {
                                      ( howmany2 * 2 ),
                                      &workspace ) );
 
-    CUDA_RT_CALL( cudaMemsetAsync( in2, size_in2, 0, NULL ) );
-    CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, NULL ) );
+    CUDA_RT_CALL( cudaMemsetAsync( in2, size_in2, 0, streams[0] ) );
+    CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, streams[0] ) );
+    POP_RANGE
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, Nxyz * sizeof( double _Complex ), 0, streams[1] ) );
+    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
+    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, Nxyz * sizeof( double _Complex ), 0, streams[3] ) );
+    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
 
     POP_RANGE
 
-    PUSH_RANGE("DST1", 2)
+    PUSH_RANGE( "DST1", 2 )
+    CUDA_RT_CALL( cudaStreamWaitEvent( streams[0], events[0], cudaEventWaitDefault ) );  // Wait for sys.rhs
     for ( l = 0; l < Nz; l++ ) {
-        DST1( l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
+        DST1( streams, l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
     }
     POP_RANGE
 
@@ -182,9 +202,10 @@ void solver( System sys ) {
      Solution of the transformed system.
      */
 
-    PUSH_RANGE("trig", 3)
-    triangular_solver_wrapper(NULL, sys, Nx, Ny, Nz, rhat, xhat, y_a);
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    PUSH_RANGE( "trig", 3 )
+    CUDA_RT_CALL( cudaStreamWaitEvent( streams[0], events[1], cudaEventWaitDefault ) );  // Wait forsys.U, sys.L, sys.Up
+    triangular_solver_wrapper( streams[0], sys, Nx, Ny, Nz, rhat, xhat, y_a );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
     POP_RANGE
 
     /*
@@ -192,13 +213,25 @@ void solver( System sys ) {
      and store the transformed vectors in the sol in the same order as xhat.
      */
 
-    PUSH_RANGE("DST2", 4)
+    PUSH_RANGE( "DST2", 4 )
+    CUDA_RT_CALL( cudaStreamWaitEvent( streams[0], events[2], cudaEventWaitDefault ) );  // Wait for sys.sol
     for ( l = 0; l < Nz; l++ ) {
-        DST2( l, Nx, Ny, Nz, xhat, sys.sol, p1, in1, out1, p2, in2, out2 );
+        DST2( streams, l, Nx, Ny, Nz, xhat, sys.sol, p1, in1, out1, p2, in2, out2 );
     }
     POP_RANGE
 
-    PUSH_RANGE("Cleanup", 5)
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );  // Wait for DST2
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, Nxyz * sizeof( double _Complex ), cudaCpuDeviceId, NULL ) );
+
+    PUSH_RANGE( "Cleanup", 5 )
+    for ( int i = 0; i < num_streams; i++ ) {
+        CUDA_RT_CALL( cudaStreamDestroy( streams[i] ) );
+    }
+
+    for ( int i = 0; i < num_events; i++ ) {
+        CUDA_RT_CALL( cudaEventDestroy( events[i] ) );
+    }
     cufftDestroy( p1 );
     cudaFree( in1 );
     cudaFree( out1 );

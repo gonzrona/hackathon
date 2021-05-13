@@ -232,15 +232,15 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
 
             for ( int l = 1; l < Nz; l++ ) {
                 d_y[idx_y + l] = cuCsub( d_rhat[Nxy * l + tidY * Nx + tidX],
-                                         cuCmul( d_SysL[Nxz * tidY + Nz * tidX + l], d_y[idx_y+( l - 1 )] ) );
+                                         cuCmul( d_SysL[Nxz * tidY + Nz * tidX + l], d_y[idx_y + ( l - 1 )] ) );
             }
 
             d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )] =
-                cuCmul( d_y[idx_y+( Nz - 1 )], d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )] );
+                cuCmul( d_y[idx_y + ( Nz - 1 )], d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )] );
 
             for ( int l = Nz - 2; l >= 0; l-- ) {
                 d_xhat[Nxz * tidY + Nz * tidX + l] = cuCmul(
-                    cuCsub( d_y[idx_y+l],
+                    cuCsub( d_y[idx_y + l],
                             cuCmul( d_SysUp[Nxz * tidY + Nz * tidX + l], d_xhat[l + 1 + tidX * Nz + tidY * Nxz] ) ),
                     d_SysU[l + tidX * Nz + tidY * Nxz] );
             }
