@@ -24,6 +24,7 @@ void load_2st_DST_wrapper( const cudaStream_t streams,
                            int                NC,
                            cuDoubleComplex *  d_rhs,
                            double *           in );
+
 void store_1st_DST_wrapper( const cudaStream_t stream,
                             int                l,
                             int                Nx,
@@ -32,7 +33,33 @@ void store_1st_DST_wrapper( const cudaStream_t stream,
                             int                NC,
                             cuDoubleComplex *  out,
                             cuDoubleComplex *  d_rhat );
-                            
+
+void load_3st_DST_wrapper( const cudaStream_t streams,
+                           int                l,
+                           int                Nx,
+                           int                Ny,
+                           int                Nz,
+                           int                NR,
+                           cuDoubleComplex *  d_rhs,
+                           double *           in );
+
+void load_4st_DST_wrapper( const cudaStream_t streams,
+                           int                l,
+                           int                Nx,
+                           int                Ny,
+                           int                NR,
+                           int                NC,
+                           cuDoubleComplex *  d_rhs,
+                           double *           in );
+
+void store_2st_DST_wrapper( const cudaStream_t stream,
+                            int                l,
+                            int                Nx,
+                            int                Ny,
+                            int                NR,
+                            int                NC,
+                            cuDoubleComplex *  out,
+                            cuDoubleComplex *  d_rhat );
 // void store_1st_DST_wrapper( const cudaStream_t streams,
 //                             const System       sys,
 //                             // const DSTN             dst,
