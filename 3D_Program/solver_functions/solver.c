@@ -184,10 +184,10 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
-    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
+    CUDA_RT_CALL( cudaEventRecord( events[1], streams[2] ) );
 
     CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, Nxyz * sizeof( double _Complex ), 0, streams[3] ) );
-    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
+    CUDA_RT_CALL( cudaEventRecord( events[2], streams[3] ) );
 
     POP_RANGE
 
