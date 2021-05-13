@@ -11,8 +11,24 @@ System defineSystem(int argc, char **argv) {
     sys.lat.Nx = 100;
     sys.lat.Ny = sys.lat.Nx;
     sys.lat.Nz = sys.lat.Nx;
-    
-    if (argc == 3) {
+
+    if (argc == 5) {
+        if (atoi(argv[1]) == 6) { sys.order = sixth; }
+        else if (atoi(argv[1]) == 4) { sys.order = fourth; }
+        else { sys.order = second; }
+        sys.lat.Nx = atoi(argv[2]);
+        sys.lat.Ny = atoi(argv[3]);
+        sys.lat.Nz = atoi(argv[4]);
+    }
+    else if (argc == 4) {
+        if (atoi(argv[1]) == 6) { sys.order = sixth; }
+        else if (atoi(argv[1]) == 4) { sys.order = fourth; }
+        else { sys.order = second; }
+        sys.lat.Nx = atoi(argv[2]);
+        sys.lat.Ny = atoi(argv[3]);
+        sys.lat.Nz = sys.lat.Nx;
+    }    
+    else if (argc == 3) {
         if (atoi(argv[1]) == 6) { sys.order = sixth; }
         else if (atoi(argv[1]) == 4) { sys.order = fourth; }
         else { sys.order = second; }
