@@ -175,51 +175,78 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    l,
     }
 }
 
-// // for (i = 0; i < Nx; i++) {
-// //   y[0] = rhat[i];
-// //   mx = i * Ny;
-// //   for (j = 1; j < Ny; j++) {
-// //     y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
-// //   }
-// //   xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
-// //   for (j = Ny - 2; j >= 0; j--) {
-// //     xhat[j + mx] = (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
-// //   }
-// // }
+// for (i = 0; i < Nx; i++) {
+//   y[0] = rhat[i];
+//   mx = i * Ny;
+//   for (j = 1; j < Ny; j++) {
+//     y[j] = rhat[ind(i, j, Nx)] - sys.L[j + mx] * y[j - 1];
+//   }
+//   xhat[Ny - 1 + mx] = y[Ny - 1] / sys.U[Ny - 1 + mx];
+//   for (j = Ny - 2; j >= 0; j--) {
+//     xhat[j + mx] = (y[j] - sys.Up[j + mx] * xhat[j + 1 + mx]) / sys.U[j + mx];
+//   }
+// }
 
-// __global__ void __launch_bounds__( 256 ) middle_stuff_DST( const int N,
-//                                                            const int Nx,
-//                                                            const int Ny,
-//                                                            const cuDoubleComplex *__restrict__ d_SysU,
-//                                                            const cuDoubleComplex *__restrict__ d_SysL,
-//                                                            const cuDoubleComplex *__restrict__ d_SysUp,
-//                                                            const cuDoubleComplex *__restrict__ d_rhat,
-//                                                            cuDoubleComplex *__restrict__ d_xhat,
-//                                                            cuDoubleComplex *__restrict__ d_y ) {
-//     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
-//     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
+// for ( j = 0; j < Ny; j++ ) {
+//     for ( i = 0; i < Nx; i++ ) {
+//         y_a[0] = rhat[i + j * Nx];
 
-//     for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-//         int mx = tidX * Ny;
-
-//         d_y[tidX] = d_rhat[tidX];
-
-//         for ( int j = 1; j < Ny; j++ ) {
-//             d_y[j * Ny + tidX] =
-//                 // d_rhat[ind(tidX, j, Nx)] - sys.L[j + mx] * d_y[(j - 1) + mx];
-//                 cuCsub( d_rhat[ind( tidX, j, Nx )], cuCmul( d_SysL[j + mx], d_y[( j - 1 ) * Ny + tidX] ) );
+//         for ( l = 1; l < Nz; l++ ) {
+//             y_a[l] = rhat[i + j * Nx + l * Nxy] - sys.L[l + i * Nz + j * Nxz] * y_a[l - 1];
 //         }
 
-//         d_xhat[Ny - 1 + mx] = cuCdiv( d_y[( Ny - 1 ) * Ny + tidX], d_SysU[Ny - 1 + mx] );
-//         for ( int j = Ny - 2; j >= 0; j-- ) {
-//             d_xhat[j + mx] =
-//                 // (d_y[j + mx] - sys.Up[j + mx] * d_xhat[j + 1 + mx]) / sys.U[j +
-//                 // mx];
-//                 cuCdiv( cuCsub( d_y[j * Ny + tidX], cuCmul( d_SysUp[j + mx], d_xhat[j + 1 + mx] ) ), d_SysU[j + mx]
-//                 );
+//         xhat[Nz - 1 + i * Nz + j * Nxz] = y_a[Nz - 1] * sys.U[Nz - 1 + i * Nz + j * Nxz];
+
+//         for ( l = Nz - 2; l >= 0; l-- ) {
+//             xhat[l + i * Nz + j * Nxz] =
+//                 ( y_a[l] - sys.Up[l + i * Nz + j * Nxz] * xhat[l + 1 + i * Nz + j * Nxz] ) *
+//                 sys.U[l + i * Nz + j * Nxz];
 //         }
 //     }
 // }
+
+__global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
+                                                            const int Ny,
+                                                            const int Nz,
+                                                            const cuDoubleComplex *__restrict__ d_SysU,
+                                                            const cuDoubleComplex *__restrict__ d_SysL,
+                                                            const cuDoubleComplex *__restrict__ d_SysUp,
+                                                            const cuDoubleComplex *__restrict__ d_rhat,
+                                                            cuDoubleComplex *__restrict__ d_xhat,
+                                                            cuDoubleComplex *__restrict__ d_y ) {
+    const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
+    const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
+
+    const int ty { static_cast<int>( blockIdx.y * blockDim.y + threadIdx.y ) };
+    const int strideY { static_cast<int>( blockDim.y * gridDim.y ) };
+
+    const int Nxy = Nx * Ny;
+    const int Nxz = Nx * Nz;
+
+    for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
+        for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
+
+            int idx_y = ( tidY * Nx + tidX ) * Nz;
+
+            d_y[idx_y] = d_rhat[tidX + tidY * Nx];
+
+            for ( int l = 1; l < Nz; l++ ) {
+                d_y[idx_y + l] = cuCsub( d_rhat[Nxy * l + tidY * Nx + tidX],
+                                         cuCmul( d_SysL[Nxz * tidY + Nz * tidX + l], d_y[idx_y+( l - 1 )] ) );
+            }
+
+            d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )] =
+                cuCmul( d_y[idx_y+( Nz - 1 )], d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )] );
+
+            for ( int l = Nz - 2; l >= 0; l-- ) {
+                d_xhat[Nxz * tidY + Nz * tidX + l] = cuCmul(
+                    cuCsub( d_y[idx_y+l],
+                            cuCmul( d_SysUp[Nxz * tidY + Nz * tidX + l], d_xhat[l + 1 + tidX * Nz + tidY * Nxz] ) ),
+                    d_SysU[l + tidX * Nz + tidY * Nxz] );
+            }
+        }
+    }
+}
 
 // // #pragma omp for
 // //   for (j = 0; j < Ny; j++) {
@@ -306,8 +333,6 @@ void load_1st_DST_wrapper( const cudaStream_t stream,
                            cuDoubleComplex *  d_rhs,
                            double *           in ) {
 
-    // int N = 2 * Nx + 2;
-
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
@@ -330,8 +355,6 @@ void load_2st_DST_wrapper( const cudaStream_t stream,
                            cuDoubleComplex *  d_rhs,
                            double *           in ) {
 
-    // int N = 2 * Nx + 2;
-
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
@@ -353,9 +376,6 @@ void store_1st_DST_wrapper( const cudaStream_t stream,
                             int                NC,
                             cuDoubleComplex *  out,
                             cuDoubleComplex *  d_rhat ) {
-
-    // int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-    // int N = 2 * Nx + 2, NC = ( N / 2 ) + 1;
 
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
@@ -381,8 +401,6 @@ void load_3st_DST_wrapper( const cudaStream_t stream,
                            cuDoubleComplex *  d_rhs,
                            double *           in ) {
 
-    // int N = 2 * Nx + 2;
-
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
@@ -404,8 +422,6 @@ void load_4st_DST_wrapper( const cudaStream_t stream,
                            int                NC,
                            cuDoubleComplex *  d_rhs,
                            double *           in ) {
-
-    // int N = 2 * Nx + 2;
 
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
@@ -429,9 +445,6 @@ void store_2st_DST_wrapper( const cudaStream_t stream,
                             cuDoubleComplex *  out,
                             cuDoubleComplex *  d_rhat ) {
 
-    // int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-    // int N = 2 * Nx + 2, NC = ( N / 2 ) + 1;
-
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
@@ -447,74 +460,31 @@ void store_2st_DST_wrapper( const cudaStream_t stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-// void load_2st_DST_wrapper( const cudaStream_t stream,
-//                            const System       sys,
-//                            //    const DSTN             dst,
-//                            const cuDoubleComplex *d_xhat,
-//                            double *               in ) {
+void triangular_solver_wrapper( const cudaStream_t     stream,
+                                System                 sys,
+                                int                    Nx,
+                                int                    Ny,
+                                int                    Nz,
+                                const cuDoubleComplex *d_rhat,
+                                cuDoubleComplex *      d_xhat,
+                                cuDoubleComplex *      d_y ) {
 
-//     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-//     int N = 2 * Nx + 2;
+    // int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
+    // int N = 2 * Nx + 2;
 
-//     int numSMs;
-//     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
+    int numSMs;
+    CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
-//     dim3 threadPerBlock { 16, 16 };
-//     dim3 blocksPerGrid( numSMs, numSMs );
+    dim3 threadPerBlock { 1, 1 };
+    dim3 blocksPerGrid( 1, 1 );
 
-//     void *args[] { &N, &Nx, &Ny, &d_xhat, &in };
+    void *args[] { &Nx, &Ny, &Nz, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
 
-//     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
+    CUDA_RT_CALL(
+        cudaLaunchKernel( ( void * )( &triangular_solver ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 
-//     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-// }
-
-// void store_2st_DST_wrapper( const cudaStream_t stream,
-//                             const System       sys,
-//                             // const DSTN             dst,
-//                             const cuDoubleComplex *out,
-//                             cuDoubleComplex *      d_sol ) {
-
-//     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-//     int N = 2 * Nx + 2, NC = ( N / 2 ) + 1;
-
-//     int numSMs;
-//     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
-
-//     dim3 threadPerBlock { 16, 16 };
-//     dim3 blocksPerGrid( numSMs, numSMs );
-
-//     double coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
-
-//     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &d_sol };
-
-//     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &store_2st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
-
-//     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-// }
-
-// void middle_stuff_DST_wrapper( const cudaStream_t     stream,
-//                                System                 sys,
-//                                const cuDoubleComplex *d_rhat,
-//                                cuDoubleComplex *      d_xhat,
-//                                cuDoubleComplex *      d_y ) {
-
-//     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
-//     int N = 2 * Nx + 2;
-
-//     int numSMs;
-//     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
-
-//     int threadPerBlock { 64 };
-//     int blocksPerGrid( numSMs );
-
-//     void *args[] { &N, &Nx, &Ny, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
-
-//     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &middle_stuff_DST ), blocksPerGrid, threadPerBlock, args, 0, stream )
-//     );
-
-//     CUDA_RT_CALL( cudaPeekAtLastError( ) );
-// }
+    CUDA_RT_CALL( cudaPeekAtLastError( ) );
+}
 
 // void middle_stuff_ls_DST_wrapper( const cudaStream_t stream,
 //                                   System             sys,

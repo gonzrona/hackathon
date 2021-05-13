@@ -8,6 +8,7 @@
 #include <cufft.h>
 
 #include "cuda_helper.h"
+#include "cuda_kernels.h"
 
 // #define USE_CUFFTW 1
 
@@ -80,7 +81,8 @@ void solver( System sys ) {
     Nxyz = Nx * Ny * Nz;
 
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &rhat ), sizeof( double complex ) * Nxyz, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nz, 1 ) );
+    // CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nz, 1 ) );
+    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nxyz, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &xhat ), sizeof( double complex ) * Nxyz, 1 ) );
 
     /*
@@ -173,20 +175,8 @@ void solver( System sys ) {
      Solution of the transformed system.
      */
 
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            y_a[0] = rhat[i + j * Nx];
-            for ( l = 1; l < Nz; l++ ) {
-                y_a[l] = rhat[i + j * Nx + l * Nxy] - sys.L[l + i * Nz + j * Nxz] * y_a[l - 1];
-            }
-            xhat[Nz - 1 + i * Nz + j * Nxz] = y_a[Nz - 1] * sys.U[Nz - 1 + i * Nz + j * Nxz];
-            for ( l = Nz - 2; l >= 0; l-- ) {
-                xhat[l + i * Nz + j * Nxz] =
-                    ( y_a[l] - sys.Up[l + i * Nz + j * Nxz] * xhat[l + 1 + i * Nz + j * Nxz] ) *
-                    sys.U[l + i * Nz + j * Nxz];
-            }
-        }
-    }
+    triangular_solver_wrapper(NULL, sys, Nx, Ny, Nz, rhat, xhat, y_a);
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     /*
      FFT transformation of the solution xhat layer by layer (z = const).

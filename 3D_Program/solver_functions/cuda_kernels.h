@@ -61,11 +61,15 @@ void store_2st_DST_wrapper( const cudaStream_t stream,
                             cuDoubleComplex *  out,
                             cuDoubleComplex *  d_rhat );
 
-// void middle_stuff_DST_wrapper( const cudaStream_t     streams,
-//                                System                 sys,
-//                                const cuDoubleComplex *d_rhat,
-//                                cuDoubleComplex *      d_xhat,
-//                                cuDoubleComplex *      d_y );
+void triangular_solver_wrapper( const cudaStream_t     stream,
+                                System                 sys,
+                                int                    Nx,
+                                int                    Ny,
+                                int                    NZ,
+                                const cuDoubleComplex *d_rhat,
+                                cuDoubleComplex *      d_xhat,
+                                cuDoubleComplex *      d_y );
+
 // void middle_stuff_ls_DST_wrapper( const cudaStream_t streams,
 //                                   System             sys,
 //                                   //   const DSTN             dst,
