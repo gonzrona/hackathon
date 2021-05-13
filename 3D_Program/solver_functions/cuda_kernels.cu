@@ -247,9 +247,9 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
     }
 }
 
-void load_1st_DST_wrapper( const cudaStream_t     stream,
-                           const System           sys,
-                        //    const DSTN             dst,
+void load_1st_DST_wrapper( const cudaStream_t stream,
+                           const System       sys,
+                           //    const DSTN             dst,
                            const cuDoubleComplex *d_rhs,
                            double *               in ) {
 
@@ -269,8 +269,8 @@ void load_1st_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void store_1st_DST_wrapper( const cudaStream_t     stream,
-                            const System           sys,
+void store_1st_DST_wrapper( const cudaStream_t stream,
+                            const System       sys,
                             // const DSTN             dst,
                             const cuDoubleComplex *out,
                             cuDoubleComplex *      d_rhat ) {
@@ -293,9 +293,9 @@ void store_1st_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void load_2st_DST_wrapper( const cudaStream_t     stream,
-                           const System           sys,
-                        //    const DSTN             dst,
+void load_2st_DST_wrapper( const cudaStream_t stream,
+                           const System       sys,
+                           //    const DSTN             dst,
                            const cuDoubleComplex *d_xhat,
                            double *               in ) {
 
@@ -315,8 +315,8 @@ void load_2st_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void store_2st_DST_wrapper( const cudaStream_t     stream,
-                            const System           sys,
+void store_2st_DST_wrapper( const cudaStream_t stream,
+                            const System       sys,
                             // const DSTN             dst,
                             const cuDoubleComplex *out,
                             cuDoubleComplex *      d_sol ) {
@@ -361,9 +361,9 @@ void middle_stuff_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void middle_stuff_ls_DST_wrapper( const cudaStream_t     stream,
-                                  System                 sys,
-                                //   const DSTN             dst,
+void middle_stuff_ls_DST_wrapper( const cudaStream_t stream,
+                                  System             sys,
+                                  //   const DSTN             dst,
                                   const cuDoubleComplex *out,
                                   double *               in,
                                   cuDoubleComplex *      d_y ) {

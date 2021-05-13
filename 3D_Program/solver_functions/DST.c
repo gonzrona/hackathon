@@ -10,15 +10,176 @@
 
 #ifdef USE_CUFFTW
 
-void DST( const int     Nx,
-          const int     Ny,
-          double *      b_2D,
-          double *      bhat,
-          cufftHandle     p1,
-          double *      in1,
+void DST1( const int l,
+           const int Nx,
+           const int Ny,
+           double complex * rhs,
+           cuDoubleComplex *rhat,
+           cufftHandle      p1,
+           double *         in1,
+           cuDoubleComplex *out1,
+           cufftHandle      p2,
+           double *         in2,
+           cuDoubleComplex *out2 ) {
+
+    int Nxy = Nx * Ny;
+
+    double coef;
+    coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
+
+    int i, j, NR, NC;
+    NR = 2 * Nx + 2;
+    NC = NR / 2 + 1;
+
+    /************************ X ***********************/
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in1[i + 1 + j * NR] = creal( rhs[( j * Nx + i ) + ( l * Nxy )] );
+        }
+    }
+
+    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    NR = 2 * Ny + 2;
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
+        }
+    }
+
+    NC = NR / 2 + 1;
+    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            rhat[( j * Nx + i ) + ( l * Nxy )].x = coef * out2[j + 1 + i * NC].y;
+        }
+    }
+
+    /************************ Y ***********************/
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in1[i + 1 + j * NR] = cimag( rhs[( j * Nx + i ) + ( l * Nxy )] );
+        }
+    }
+
+    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    NR = 2 * Ny + 2;
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
+        }
+    }
+
+    NC = NR / 2 + 1;
+    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            rhat[( j * Nx + i ) + ( l * Nxy )].y = coef * out2[j + 1 + i * NC].y;
+        }
+    }
+
+    return;
+}
+
+void DST2( const int l,
+           const int Nx,
+           const int Ny,
+           const int Nz,
+           double complex * xhat,
+           cuDoubleComplex *sol,
+           cufftHandle      p1,
+           double *         in1,
+           cuDoubleComplex *out1,
+           cufftHandle      p2,
+           double *         in2,
+           cuDoubleComplex *out2 ) {
+
+    int Nxy = Nx * Ny;
+
+    double coef;
+    coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
+
+    int i, j, NR, NC;
+    NR = 2 * Nx + 2;
+    NC = NR / 2 + 1;
+
+    /************************ X ***********************/
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in1[i + 1 + j * NR] = creal( xhat[l + ( ( j * Nx + i ) * Nz )] );
+        }
+    }
+
+    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    NR = 2 * Ny + 2;
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
+        }
+    }
+
+    NC = NR / 2 + 1;
+    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            sol[( j * Nx + i ) + ( l * Nxy )].x = coef * out2[j + 1 + i * NC].y;
+        }
+    }
+
+    /************************ Y ***********************/
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in1[i + 1 + j * NR] = cimag( xhat[l + ( ( j * Nx + i ) * Nz )] );
+        }
+    }
+
+    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    NR = 2 * Ny + 2;
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
+        }
+    }
+
+    NC = NR / 2 + 1;
+    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+
+    for ( j = 0; j < Ny; j++ ) {
+        for ( i = 0; i < Nx; i++ ) {
+            sol[( j * Nx + i ) + ( l * Nxy )].y = coef * out2[j + 1 + i * NC].y;
+        }
+    }
+
+    return;
+}
+
+void DST( const int        Nx,
+          const int        Ny,
+          double *         b_2D,
+          double *         bhat,
+          cufftHandle      p1,
+          double *         in1,
           cuDoubleComplex *out1,
-          cufftHandle     p2,
-          double *      in2,
+          cufftHandle      p2,
+          double *         in2,
           cuDoubleComplex *out2 ) {
     double coef;
     coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
@@ -35,7 +196,7 @@ void DST( const int     Nx,
 
     // fftw_execute( p1 );
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize());
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NR = 2 * Ny + 2;
 
@@ -55,7 +216,7 @@ void DST( const int     Nx,
 
     // fftw_execute( p2 );
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize());
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     for ( i = 0; i < Nx; i++ ) {
         for ( j = 0; j < Ny; j++ ) {
@@ -70,24 +231,6 @@ void DST( const int     Nx,
     }
 
     return;
-
-    // PUSH_RANGE( "1st DST", 2 )
-    // load_1st_DST_wrapper( NULL, sys, dst, sys.rhs, in );
-
-    // CUDA_RT_CALL( cufftExecD2Z( plan, in, out ) );  // Running in streams[0]
-    // store_1st_DST_wrapper( NULL, sys, dst, out, d_rhat );
-    // POP_RANGE
-
-    // PUSH_RANGE( "Trig Solver", 3 )
-    // middle_stuff_DST_wrapper( NULL, sys, d_rhat, d_xhat, d_y );
-    // POP_RANGE
-
-    // PUSH_RANGE( "2nd DST", 4 )
-    // load_2st_DST_wrapper( NULL, sys, dst, d_xhat, in );
-
-    // CUDA_RT_CALL( cufftExecD2Z( plan, in, out ) );  // Running in streams[0]
-    // store_2st_DST_wrapper( NULL, sys, dst, out, sys.sol );
-    // POP_RANGE
 }
 #else
 void DST( const int     Nx,

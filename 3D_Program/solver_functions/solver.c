@@ -13,15 +13,40 @@
 
 #ifdef USE_CUFFTW
 
-void DST( int           Nx,
-          int           Ny,
-          double *      b_2D,
-          double *      bhat,
-          cufftHandle     p1,
-          double *      in1,
+void DST1( const int l,
+           const int Nx,
+           const int Ny,
+           double complex * rhs,
+           cuDoubleComplex *rhat,
+           cufftHandle      p1,
+           double *         in1,
+           cuDoubleComplex *out1,
+           cufftHandle      p2,
+           double *         in2,
+           cuDoubleComplex *out2 );
+
+void DST2( const int l,
+           const int Nx,
+           const int Ny,
+           const int Nz,
+           double complex * xhat,
+           cuDoubleComplex *sol,
+           cufftHandle      p1,
+           double *         in1,
+           cuDoubleComplex *out1,
+           cufftHandle      p2,
+           double *         in2,
+           cuDoubleComplex *out2 );
+
+void DST( int              Nx,
+          int              Ny,
+          double *         b_2D,
+          double *         bhat,
+          cufftHandle      p1,
+          double *         in1,
           cuDoubleComplex *out1,
-          cufftHandle     p2,
-          double *      in2,
+          cufftHandle      p2,
+          double *         in2,
           cuDoubleComplex *out2 );
 
 void solver( System sys ) {
@@ -54,10 +79,6 @@ void solver( System sys ) {
     Nxz  = Nx * Nz;
     Nxyz = Nx * Ny * Nz;
 
-    // rhat = malloc( Nxyz * sizeof( double complex ) );
-    // y_a  = malloc( Nz * sizeof( double complex ) );
-    // xhat = malloc( Nxyz * sizeof( double complex ) );
-
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &rhat ), sizeof( double complex ) * Nxyz, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nz, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &xhat ), sizeof( double complex ) * Nxyz, 1 ) );
@@ -66,9 +87,9 @@ void solver( System sys ) {
      FFT transformation of the rhs layer by layer (z = const).
      and store the transformed vectors in the rhat in the same order as rhs.
      */
-    int           i, j, l;
-    int           m, NR, NC;
-    double *      in1, *in2;
+    int              i, j, l;
+    int              m, NR, NC;
+    double *         in1, *in2;
     cuDoubleComplex *out1, *out2;
     // fftw_plan     p1, p2;
 
@@ -87,11 +108,8 @@ void solver( System sys ) {
     const int odist1   = NC;
     int *     inembed1 = NULL, *onembed1 = NULL;
 
-    size_t size_in1 = sizeof( double ) * NR * m;
+    size_t size_in1  = sizeof( double ) * NR * m;
     size_t size_out1 = sizeof( cuDoubleComplex ) * NC * m;
-
-    // in1 = (double*) fftw_malloc(sizeof(double) * NR*m);
-    // out1 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC*m);
 
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in1, size_in1, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out1, size_out1, 1 ) );
@@ -99,9 +117,6 @@ void solver( System sys ) {
     CUDA_RT_CALL( cufftCreate( &p1 ) );
     CUDA_RT_CALL( cufftMakePlanMany(
         p1, rank1, nr1, inembed1, istride1, idist1, onembed1, ostride1, odist1, CUFFT_D2Z, howmany1, &workspace ) );
-
-    // p1 = fftw_plan_many_dft_r2c(
-    //     rank1, nr1, howmany1, in1, inembed1, istride1, idist1, out1, onembed1, ostride1, odist1, FFTW_ESTIMATE );
 
     CUDA_RT_CALL( cudaMemsetAsync( in1, size_in1, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out1, size_out1, 0, NULL ) );
@@ -118,11 +133,8 @@ void solver( System sys ) {
     const int odist2   = NC;
     int *     inembed2 = NULL, *onembed2 = NULL;
 
-    size_t size_in2 = sizeof( double ) * NR * m;
+    size_t size_in2  = sizeof( double ) * NR * m;
     size_t size_out2 = sizeof( cuDoubleComplex ) * NC * m;
-
-    // in2 = (double*) fftw_malloc(sizeof(double) * NR*m);
-    // out2 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * NC*m);
 
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &in2 ), size_in2, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &out2 ), size_out2, 1 ) );
@@ -131,20 +143,8 @@ void solver( System sys ) {
     CUDA_RT_CALL( cufftMakePlanMany(
         p2, rank2, nr2, inembed2, istride2, idist2, onembed2, ostride2, odist2, CUFFT_D2Z, howmany2, &workspace ) );
 
-    // p2 = fftw_plan_many_dft_r2c(
-        // rank2, nr2, howmany2, in2, inembed2, istride2, idist2, out2, onembed2, ostride2, odist2, FFTW_ESTIMATE );
-
-    // for ( j = 0; j < NR * m; j++ ) {
-    //     in2[j] = 0.0;
-    // }
-
     CUDA_RT_CALL( cudaMemsetAsync( in2, size_in2, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, NULL ) );
-
-    // double *b_2D_r = malloc( Nxy * sizeof( double ) );
-    // double *b_2D_i = malloc( Nxy * sizeof( double ) );
-    // double *bhat_r = malloc( Nxy * sizeof( double ) );
-    // double *bhat_i = malloc( Nxy * sizeof( double ) );
 
     double *b_2D_r;
     double *b_2D_i;
@@ -157,17 +157,7 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &bhat_i ), sizeof( double ) * Nxy, 1 ) );
 
     for ( l = 0; l < Nz; l++ ) {
-        for ( i = 0; i < Nxy; i++ ) {
-            b_2D_r[i] = creal( sys.rhs[i + l * Nxy] );
-            b_2D_i[i] = cimag( sys.rhs[i + l * Nxy] );
-        }
-
-        DST( Nx, Ny, b_2D_r, bhat_r, p1, in1, out1, p2, in2, out2 );
-        DST( Nx, Ny, b_2D_i, bhat_i, p1, in1, out1, p2, in2, out2 );
-
-        for ( i = 0; i < Nxy; i++ ) {
-            rhat[i + l * Nxy] = bhat_r[i] + I * bhat_i[i];
-        }
+        DST1( l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
     }
 
     /*
@@ -195,40 +185,30 @@ void solver( System sys ) {
      */
 
     for ( l = 0; l < Nz; l++ ) {
-        for ( i = 0; i < Nxy; i++ ) {
-            b_2D_r[i] = creal( xhat[l + i * Nz] );
-            b_2D_i[i] = cimag( xhat[l + i * Nz] );
-        }
-
-        DST( Nx, Ny, b_2D_r, bhat_r, p1, in1, out1, p2, in2, out2 );
-        DST( Nx, Ny, b_2D_i, bhat_i, p1, in1, out1, p2, in2, out2 );
-
-        for ( i = 0; i < Nxy; i++ ) {
-            sys.sol[i + l * Nxy] = bhat_r[i] + I * bhat_i[i];
-        }
+        DST2( l, Nx, Ny, Nz, xhat, sys.sol, p1, in1, out1, p2, in2, out2 );
     }
 
-    // fftw_destroy_plan( p1 );
-    // cudaFree( in1 );
-    // cudaFree( out1 );
-    // fftw_destroy_plan( p2 );
-    // cudaFree( in2 );
-    // cudaFree( out2 );
-    // cudaFree( b_2D_r );
-    // b_2D_r = NULL;
-    // cudaFree( b_2D_i );
-    // b_2D_i = NULL;
-    // cudaFree( bhat_r );
-    // bhat_r = NULL;
-    // cudaFree( bhat_i );
-    // bhat_i = NULL;
+    cufftDestroy( p1 );
+    cudaFree( in1 );
+    cudaFree( out1 );
+    cufftDestroy( p2 );
+    cudaFree( in2 );
+    cudaFree( out2 );
+    cudaFree( b_2D_r );
+    b_2D_r = NULL;
+    cudaFree( b_2D_i );
+    b_2D_i = NULL;
+    cudaFree( bhat_r );
+    bhat_r = NULL;
+    cudaFree( bhat_i );
+    bhat_i = NULL;
 
-    // cudaFree( rhat );
-    // rhat = NULL;
-    // cudaFree( y_a );
-    // y_a = NULL;
-    // cudaFree( xhat );
-    // xhat = NULL;
+    cudaFree( rhat );
+    rhat = NULL;
+    cudaFree( y_a );
+    y_a = NULL;
+    cudaFree( xhat );
+    xhat = NULL;
 
     return;
 }
