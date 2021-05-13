@@ -1,3 +1,5 @@
+#pragma once
+
 System defineSystem(int argc, char **argv);
 System userInput();
 

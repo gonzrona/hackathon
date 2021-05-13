@@ -1,4 +1,12 @@
+#include <cuComplex.h>
+#include <cufft.h>
+
 #include "../headers/structs.h"
+
+#include "cuda_helper.h"
+#include "cuda_kernels.h"
+
+#define USE_CUFFTW 1
 
 #ifdef USE_CUFFTW
 
@@ -58,6 +66,24 @@ void DST( const int     Nx,
     }
 
     return;
+
+    // PUSH_RANGE( "1st DST", 2 )
+    // load_1st_DST_wrapper( NULL, sys, dst, sys.rhs, in );
+
+    // CUDA_RT_CALL( cufftExecD2Z( plan, in, out ) );  // Running in streams[0]
+    // store_1st_DST_wrapper( NULL, sys, dst, out, d_rhat );
+    // POP_RANGE
+
+    // PUSH_RANGE( "Trig Solver", 3 )
+    // middle_stuff_DST_wrapper( NULL, sys, d_rhat, d_xhat, d_y );
+    // POP_RANGE
+
+    // PUSH_RANGE( "2nd DST", 4 )
+    // load_2st_DST_wrapper( NULL, sys, dst, d_xhat, in );
+
+    // CUDA_RT_CALL( cufftExecD2Z( plan, in, out ) );  // Running in streams[0]
+    // store_2st_DST_wrapper( NULL, sys, dst, out, sys.sol );
+    // POP_RANGE
 }
 #else
 void DST( const int     Nx,
