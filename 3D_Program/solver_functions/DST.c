@@ -118,7 +118,6 @@ void DST( const int        Nx,
         }
     }
 
-    // fftw_execute( p1 );
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
@@ -138,7 +137,6 @@ void DST( const int        Nx,
 
     NC = NR / 2 + 1;
 
-    // fftw_execute( p2 );
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
