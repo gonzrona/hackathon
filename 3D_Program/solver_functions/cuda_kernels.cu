@@ -15,12 +15,17 @@ __device__ cuDoubleComplex ComplexScale( cuDoubleComplex const &a, double const 
 //         in1[i + 1 + j * NR] = creal( rhs[( j * Nx + i ) + ( l * Nxy )] );
 //     }
 // }
+// for ( j = 0; j < Ny; j++ ) {
+//     for ( i = 0; i < Nx; i++ ) {
+//         in1[i + 1 + j * NR] = cimag( rhs[( j * Nx + i ) + ( l * Nxy )] );
+//     }
+// }
 __global__ void __launch_bounds__( 256 ) load_1st_DST( const int l,
                                                        const int NR,
                                                        const int Nx,
                                                        const int Ny,
                                                        const cuDoubleComplex *__restrict__ rhs,
-                                                       double *__restrict__ in ) {
+                                                       double *__restrict__ in1 ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
 
@@ -29,8 +34,8 @@ __global__ void __launch_bounds__( 256 ) load_1st_DST( const int l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidY * NR + tidX + 1]                   = rhs[( tidY * Nx + tidX ) + ( l * Nx * Ny )].x;
-            in[( NR * Ny ) + ( tidY * NR + tidX + 1 )] = rhs[( tidY * Nx + tidX ) + ( l * Nx * Ny )].y;
+            in1[tidY * NR + tidX + 1]                   = rhs[( l * Nx * Ny ) + ( tidY * Nx + tidX )].x;
+            in1[( NR * Ny ) + ( tidY * NR + tidX + 1 )] = rhs[( l * Nx * Ny ) + ( tidY * Nx + tidX )].y;
         }
     }
 }
@@ -45,8 +50,8 @@ __global__ void __launch_bounds__( 256 ) load_2st_DST( const int l,
                                                        const int NC,
                                                        const int Nx,
                                                        const int Ny,
-                                                       const cuDoubleComplex *__restrict__ out,
-                                                       double *__restrict__ in ) {
+                                                       const cuDoubleComplex *__restrict__ out1,
+                                                       double *__restrict__ in2 ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
 
@@ -55,8 +60,8 @@ __global__ void __launch_bounds__( 256 ) load_2st_DST( const int l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidX * NR + tidY + 1]                   = out[tidY * NC + tidX + 1].y;
-            in[( NR * Ny ) + ( tidX * NR + tidY + 1 )] = out[( NC * Ny ) + ( tidY * NC + tidX + 1 )].y;
+            in2[tidX * NR + tidY + 1]                   = out1[tidY * NC + tidX + 1].y;
+            in2[( NR * Nx ) + ( tidX * NR + tidY + 1 )] = out1[( NC * Ny ) + ( tidY * NC + tidX + 1 )].y;
         }
     }
 }
@@ -73,7 +78,7 @@ __global__ void __launch_bounds__( 256 ) store_1st_DST( const int    l,
                                                         const int    Nx,
                                                         const int    Ny,
                                                         const double coef,
-                                                        const cuDoubleComplex *__restrict__ out,
+                                                        const cuDoubleComplex *__restrict__ out2,
                                                         cuDoubleComplex *__restrict__ d_rhat ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
@@ -84,8 +89,8 @@ __global__ void __launch_bounds__( 256 ) store_1st_DST( const int    l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            d_rhat[( Nx * tidY + tidX ) + ( l * Nx * Ny )].x = coef * out[tidX * NC + tidY + 1].y;
-            d_rhat[( Nx * tidY + tidX ) + ( l * Nx * Ny )].y = coef * out[( NC * Ny ) + ( tidX * NC + tidY + 1 )].y;
+            d_rhat[( Nx * tidY + tidX ) + ( l * Nx * Ny )].x = coef * out2[tidX * NC + tidY + 1].y;
+            d_rhat[( Nx * tidY + tidX ) + ( l * Nx * Ny )].y = coef * out2[( NC * Nx ) + ( tidX * NC + tidY + 1 )].y;
         }
     }
 }
@@ -101,7 +106,7 @@ __global__ void __launch_bounds__( 256 ) load_3st_DST( const int l,
                                                        const int Ny,
                                                        const int Nz,
                                                        const cuDoubleComplex *__restrict__ d_xhat,
-                                                       double *__restrict__ in ) {
+                                                       double *__restrict__ in1 ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
 
@@ -110,8 +115,8 @@ __global__ void __launch_bounds__( 256 ) load_3st_DST( const int l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidY * NR + tidX + 1]                   = d_xhat[l + ( tidY * Nx + tidX ) * Nz].x;
-            in[( NR * Ny ) + ( tidY * NR + tidX + 1 )] = d_xhat[l + ( tidY * Nx + tidX ) * Nz].y;
+            in1[tidY * NR + tidX + 1]                   = d_xhat[l + ( tidY * Nx + tidX ) * Nz].x;
+            in1[( NR * Ny ) + ( tidY * NR + tidX + 1 )] = d_xhat[l + ( tidY * Nx + tidX ) * Nz].y;
         }
     }
 }
@@ -126,8 +131,8 @@ __global__ void __launch_bounds__( 256 ) load_4st_DST( const int l,
                                                        const int NC,
                                                        const int Nx,
                                                        const int Ny,
-                                                       const cuDoubleComplex *__restrict__ out,
-                                                       double *__restrict__ in ) {
+                                                       const cuDoubleComplex *__restrict__ out1,
+                                                       double *__restrict__ in2 ) {
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
 
@@ -136,8 +141,8 @@ __global__ void __launch_bounds__( 256 ) load_4st_DST( const int l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidX * NR + tidY + 1]                   = out[tidY * NC + tidX + 1].y;
-            in[( NR * Ny ) + ( tidX * NR + tidY + 1 )] = out[( NC * Ny ) + ( tidY * NC + tidX + 1 )].y;
+            in2[tidX * NR + tidY + 1]                   = out1[tidY * NC + tidX + 1].y;
+            in2[( NR * Nx ) + ( tidX * NR + tidY + 1 )] = out1[( NC * Ny ) + ( tidY * NC + tidX + 1 )].y;
         }
     }
 }
@@ -153,7 +158,7 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    l,
                                                         const int    Nx,
                                                         const int    Ny,
                                                         const double coef,
-                                                        const cuDoubleComplex *__restrict__ out,
+                                                        const cuDoubleComplex *__restrict__ out2,
                                                         cuDoubleComplex *__restrict__ d_sol ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
@@ -164,8 +169,8 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            d_sol[( Nx * tidY + tidX ) + ( l * Nx * Ny )].x = coef * out[tidX * NC + tidY + 1].y;
-            d_sol[( Nx * tidY + tidX ) + ( l * Nx * Ny )].y = coef * out[( NC * Ny ) + ( tidX * NC + tidY + 1 )].y;
+            d_sol[( tidY * Nx + tidX ) + ( l * Nx * Ny )].x = coef * out2[tidX * NC + tidY + 1].y;
+            d_sol[( tidY * Nx + tidX ) + ( l * Nx * Ny )].y = coef * out2[( NC * Nx ) + ( tidX * NC + tidY + 1 )].y;
         }
     }
 }
