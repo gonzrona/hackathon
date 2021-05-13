@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -6,6 +8,8 @@
 #include <time.h>
 #include <sys/time.h>
 
+#define ind(i,j,Nx) i+(j)*(Nx)
+#define ind_e(i,j,Nx) i+1+(j+1)*(Nx+2)
 
 enum Order{second, fourth, sixth};
 
@@ -19,12 +23,13 @@ typedef struct {
 
     enum Order order;
     
-    double complex *a, *b, *c, *d, *ap, *bp, *cp, *dp, *am, *bm, *cm, *dm;
-    double complex *k_bg_ext, *k2_bg_ext;
+    double _Complex * a;
+    double _Complex *b, *c, *d, *ap, *bp, *cp, *dp, *am, *bm, *cm, *dm;
+    double _Complex *k_bg_ext, *k2_bg_ext;
     double A,B,C,beta,gamma;
-    double complex *sol_analytic, *rhs;
-    double complex *L, *U, *Up;
-    double complex *sol, *res, *error;
+    double _Complex *sol_analytic, *rhs;
+    double _Complex *L, *U, *Up;
+    double _Complex *sol, *res, *error;
 } System;
 
 
