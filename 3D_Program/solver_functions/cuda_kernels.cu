@@ -19,7 +19,8 @@ __device__ cuDoubleComplex ComplexScale( cuDoubleComplex const &a, double const 
 //            in2[(j * N) + i + 1] = sys.rhs[i + j * Nx].y;
 //         }
 //     }
-__global__ void __launch_bounds__( 256 ) load_1st_DST( const int N,
+__global__ void __launch_bounds__( 256 ) load_1st_DST( const int l,
+                                                       const int N,
                                                        const int Nx,
                                                        const int Ny,
                                                        const cuDoubleComplex *__restrict__ rhs,
@@ -32,8 +33,8 @@ __global__ void __launch_bounds__( 256 ) load_1st_DST( const int N,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            in[tidY * N + tidX + 1]                  = rhs[tidX + tidY * Nx].x;
-            in[( N * Ny ) + ( tidY * N + tidX + 1 )] = rhs[tidX + tidY * Nx].y;
+            in[tidY * N + tidX + 1]                  = rhs[(tidY * Nx + tidX) + (l * Nx * Ny)].x;
+            // in[( N * Ny ) + ( tidY * N + tidX + 1 )] = rhs[tidX + tidY * Nx].y;
         }
     }
 }
@@ -247,13 +248,13 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
     }
 }
 
-void load_1st_DST_wrapper( const cudaStream_t stream,
-                           const System       sys,
-                           //    const DSTN             dst,
-                           const cuDoubleComplex *d_rhs,
+void load_1st_DST_wrapper( const cudaStream_t     stream,
+                           int              l,
+                           int              Nx,
+                           int              Ny,
+                           cuDoubleComplex *d_rhs,
                            double *               in ) {
 
-    int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2;
 
     int numSMs;
@@ -262,7 +263,7 @@ void load_1st_DST_wrapper( const cudaStream_t stream,
     dim3 threadPerBlock { 16, 16 };
     dim3 blocksPerGrid( numSMs, numSMs );
 
-    void *args[] { &N, &Nx, &Ny, &d_rhs, &in };
+    void *args[] { &l, &N, &Nx, &Ny, &d_rhs, &in };
 
     CUDA_RT_CALL( cudaLaunchKernel( ( void * )( &load_1st_DST ), blocksPerGrid, threadPerBlock, args, 0, stream ) );
 

@@ -33,11 +33,13 @@ void DST1( const int l,
 
     /************************ X ***********************/
 
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in1[i + 1 + j * NR] = creal( rhs[( j * Nx + i ) + ( l * Nxy )] );
-        }
-    }
+    // for ( j = 0; j < Ny; j++ ) {
+    //     for ( i = 0; i < Nx; i++ ) {
+    //         in1[i + 1 + j * NR] = creal( rhs[( j * Nx + i ) + ( l * Nxy )] );
+    //     }
+    // }
+
+    load_1st_DST_wrapper( NULL, l, Nx, Ny, rhs, in1 );
 
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
