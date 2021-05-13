@@ -6,7 +6,7 @@
 #include "cuda_helper.h"
 #include "cuda_kernels.h"
 
-#define USE_CUFFTW 1
+// #define USE_CUFFTW 1
 
 #ifdef USE_CUFFTW
 
@@ -14,12 +14,12 @@ void DST( const int     Nx,
           const int     Ny,
           double *      b_2D,
           double *      bhat,
-          fftw_plan     p1,
+          cufftHandle     p1,
           double *      in1,
-          fftw_complex *out1,
-          fftw_plan     p2,
+          cuDoubleComplex *out1,
+          cufftHandle     p2,
           double *      in2,
-          fftw_complex *out2 ) {
+          cuDoubleComplex *out2 ) {
     double coef;
     coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
 
@@ -33,13 +33,15 @@ void DST( const int     Nx,
         }
     }
 
-    fftw_execute( p1 );
+    // fftw_execute( p1 );
+    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize());
 
     NR = 2 * Ny + 2;
 
     for ( j = 0; j < Ny; j++ ) {
         for ( i = 0; i < Nx; i++ ) {
-            b_2D[i + j * Nx] = cimag( out1[i + 1 + j * NC] );
+            b_2D[i + j * Nx] = out1[i + 1 + j * NC].y;
         }
     }
 
@@ -51,11 +53,13 @@ void DST( const int     Nx,
 
     NC = NR / 2 + 1;
 
-    fftw_execute( p2 );
+    // fftw_execute( p2 );
+    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
+    CUDA_RT_CALL( cudaDeviceSynchronize());
 
     for ( i = 0; i < Nx; i++ ) {
         for ( j = 0; j < Ny; j++ ) {
-            bhat[i + j * Nx] = cimag( out2[j + 1 + i * NC] );
+            bhat[i + j * Nx] = out2[j + 1 + i * NC].y;
         }
     }
 
