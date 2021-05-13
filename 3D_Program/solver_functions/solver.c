@@ -89,11 +89,10 @@ void solver( System sys ) {
      */
     int              i, j, l;
     int              m, NR, NC;
-    double *         in1, *in2, *in3, *in4;
-    cuDoubleComplex *out1, *out2, *out3, *out4;
-    // fftw_plan     p1, p2;
+    double *         in1, *in2;
+    cuDoubleComplex *out1, *out2;
 
-    cufftHandle p1, p2, p3, p4;
+    cufftHandle p1, p2;
     size_t      workspace;
 
     m                  = Ny;
@@ -166,16 +165,6 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMemsetAsync( in2, size_in2, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, NULL ) );
 
-    double *b_2D_r;
-    double *b_2D_i;
-    double *bhat_r;
-    double *bhat_i;
-
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &b_2D_r ), sizeof( double ) * Nxy, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &b_2D_i ), sizeof( double ) * Nxy, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &bhat_r ), sizeof( double ) * Nxy, 1 ) );
-    CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &bhat_i ), sizeof( double ) * Nxy, 1 ) );
-
     for ( l = 0; l < Nz; l++ ) {
         DST1( l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
     }
@@ -214,14 +203,6 @@ void solver( System sys ) {
     cufftDestroy( p2 );
     cudaFree( in2 );
     cudaFree( out2 );
-    cudaFree( b_2D_r );
-    b_2D_r = NULL;
-    cudaFree( b_2D_i );
-    b_2D_i = NULL;
-    cudaFree( bhat_r );
-    bhat_r = NULL;
-    cudaFree( bhat_i );
-    bhat_i = NULL;
 
     cudaFree( rhat );
     rhat = NULL;
