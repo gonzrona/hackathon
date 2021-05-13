@@ -196,6 +196,7 @@ void solver( System sys ) {
     for ( l = 0; l < Nz; l++ ) {
         DST1( streams, l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
     }
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
     POP_RANGE
 
     /*
@@ -205,7 +206,7 @@ void solver( System sys ) {
     PUSH_RANGE( "trig", 3 )
     CUDA_RT_CALL( cudaStreamWaitEvent( streams[0], events[1], cudaEventWaitDefault ) );  // Wait forsys.U, sys.L, sys.Up
     triangular_solver_wrapper( streams[0], sys, Nx, Ny, Nz, rhat, xhat, y_a );
-    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
     POP_RANGE
 
     /*
@@ -218,6 +219,7 @@ void solver( System sys ) {
     for ( l = 0; l < Nz; l++ ) {
         DST2( streams, l, Nx, Ny, Nz, xhat, sys.sol, p1, in1, out1, p2, in2, out2 );
     }
+    CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );
     POP_RANGE
 
     CUDA_RT_CALL( cudaStreamSynchronize( streams[0] ) );  // Wait for DST2

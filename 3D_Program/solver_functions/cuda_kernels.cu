@@ -228,7 +228,7 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
 
             int idx_y = ( tidY * Nx + tidX ) * Nz;
 
-            d_y[idx_y] = d_rhat[tidX + tidY * Nx];
+            d_y[idx_y] = d_rhat[tidY * Nx + tidX];
 
             for ( int l = 1; l < Nz; l++ ) {
                 d_y[idx_y + l] = cuCsub( d_rhat[Nxy * l + tidY * Nx + tidX],
@@ -241,8 +241,8 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
             for ( int l = Nz - 2; l >= 0; l-- ) {
                 d_xhat[Nxz * tidY + Nz * tidX + l] = cuCmul(
                     cuCsub( d_y[idx_y + l],
-                            cuCmul( d_SysUp[Nxz * tidY + Nz * tidX + l], d_xhat[l + 1 + tidX * Nz + tidY * Nxz] ) ),
-                    d_SysU[l + tidX * Nz + tidY * Nxz] );
+                            cuCmul( d_SysUp[Nxz * tidY + Nz * tidX + l], d_xhat[Nxz * tidY + Nz * tidX + 1 + l] ) ),
+                    d_SysU[Nxz * tidY + Nz * tidX + l] );
             }
         }
     }
