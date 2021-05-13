@@ -1,5 +1,6 @@
+#pragma once
+
 #include <cuda_runtime.h>
-#include <cufftw.h>
 #include <nvToolsExt.h>
 
 //*****************************************************

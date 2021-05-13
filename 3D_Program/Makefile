@@ -16,7 +16,7 @@ ARCHES	:=-gencode arch=compute_70,code=\"compute_70,sm_70\" \
 ifneq ($(origin USE_CUFFTW), undefined)
 	ifneq ($(USE_CUFFTW), 0)
 		CFLAGS += -DUSE_CUFFTW
-		LIBS += -lcufft -lcufftw -lcudart
+		LIBS += -lcufft -lcudart -lfftw3_omp -lfftw3
 	else
 		LIBS += -lfftw3_omp -lfftw3
 	endif

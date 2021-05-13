@@ -247,9 +247,9 @@ __global__ void __launch_bounds__( 64 ) middle_stuff_ls_DST( const int    N,
     }
 }
 
-void load_1st_DST_wrapper( const cudaStream_t     stream,
-                           const System           sys,
-                           const DSTN             dst,
+void load_1st_DST_wrapper( const cudaStream_t stream,
+                           const System       sys,
+                           //    const DSTN             dst,
                            const cuDoubleComplex *d_rhs,
                            double *               in ) {
 
@@ -269,9 +269,9 @@ void load_1st_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void store_1st_DST_wrapper( const cudaStream_t     stream,
-                            const System           sys,
-                            const DSTN             dst,
+void store_1st_DST_wrapper( const cudaStream_t stream,
+                            const System       sys,
+                            // const DSTN             dst,
                             const cuDoubleComplex *out,
                             cuDoubleComplex *      d_rhat ) {
 
@@ -284,7 +284,7 @@ void store_1st_DST_wrapper( const cudaStream_t     stream,
     dim3 threadPerBlock { 16, 16 };
     dim3 blocksPerGrid( numSMs, numSMs );
 
-    double coef = dst.coef;
+    double coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
 
     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &d_rhat };
 
@@ -293,9 +293,9 @@ void store_1st_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void load_2st_DST_wrapper( const cudaStream_t     stream,
-                           const System           sys,
-                           const DSTN             dst,
+void load_2st_DST_wrapper( const cudaStream_t stream,
+                           const System       sys,
+                           //    const DSTN             dst,
                            const cuDoubleComplex *d_xhat,
                            double *               in ) {
 
@@ -315,9 +315,9 @@ void load_2st_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void store_2st_DST_wrapper( const cudaStream_t     stream,
-                            const System           sys,
-                            const DSTN             dst,
+void store_2st_DST_wrapper( const cudaStream_t stream,
+                            const System       sys,
+                            // const DSTN             dst,
                             const cuDoubleComplex *out,
                             cuDoubleComplex *      d_sol ) {
 
@@ -330,7 +330,7 @@ void store_2st_DST_wrapper( const cudaStream_t     stream,
     dim3 threadPerBlock { 16, 16 };
     dim3 blocksPerGrid( numSMs, numSMs );
 
-    double coef = dst.coef;
+    double coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
 
     void *args[] { &N, &Nx, &Ny, &NC, &coef, &out, &d_sol };
 
@@ -361,9 +361,9 @@ void middle_stuff_DST_wrapper( const cudaStream_t     stream,
     CUDA_RT_CALL( cudaPeekAtLastError( ) );
 }
 
-void middle_stuff_ls_DST_wrapper( const cudaStream_t     stream,
-                                  System                 sys,
-                                  const DSTN             dst,
+void middle_stuff_ls_DST_wrapper( const cudaStream_t stream,
+                                  System             sys,
+                                  //   const DSTN             dst,
                                   const cuDoubleComplex *out,
                                   double *               in,
                                   cuDoubleComplex *      d_y ) {
@@ -371,7 +371,7 @@ void middle_stuff_ls_DST_wrapper( const cudaStream_t     stream,
     int Nx = sys.lat.Nx, Ny = sys.lat.Ny;
     int N = 2 * Nx + 2, NC = ( N / 2 ) + 1;
 
-    double coef = dst.coef;
+    double coef = 2.0 / sqrt( Nx + 1 ) / sqrt( Ny + 1 );
 
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );

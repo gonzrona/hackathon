@@ -1,6 +1,8 @@
 #include "../headers/structs.h"
 #include "../headers/prototypes.h"
 
+#include "../solver_functions/cuda_helper.h"
+
 System defineSystem(int argc, char **argv) {
     
     System sys = userInput();
@@ -29,7 +31,35 @@ System defineSystem(int argc, char **argv) {
     sys.lat.hz = (sys.lat.z1-sys.lat.z0)/(sys.lat.Nz+1);
 
     sys.lat.Nxyz = sys.lat.Nx * sys.lat.Ny * sys.lat.Nz;
+
+#if USE_CUFFTW
+    cudaMallocManaged((void**)&sys.a, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.b, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.c, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.d, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.ap, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.bp, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.cp, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.dp, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.am, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.bm, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.cm, sys.lat.Nz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.dm, sys.lat.Nz * sizeof(double complex), 1);
     
+    cudaMallocManaged((void**)&sys.k_bg_ext, (sys.lat.Nz+2) * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.k2_bg_ext, (sys.lat.Nz+2) * sizeof(double complex), 1);
+    
+    cudaMallocManaged((void**)&sys.sol_analytic, sys.lat.Nxyz * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.rhs, sys.lat.Nxyz * sizeof(double complex), 1);
+    
+    cudaMallocManaged((void**)&sys.L, sys.lat.Nxyz  * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.U, sys.lat.Nxyz  * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.Up, sys.lat.Nxyz  * sizeof(double complex), 1);
+
+    cudaMallocManaged((void**)&sys.sol, sys.lat.Nxyz  * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.res, sys.lat.Nxyz  * sizeof(double complex), 1);
+    cudaMallocManaged((void**)&sys.error, sys.lat.Nxyz  * sizeof(double complex), 1);
+#else    
     sys.a = malloc(sys.lat.Nz * sizeof(double complex));
     sys.b = malloc(sys.lat.Nz * sizeof(double complex));
     sys.c = malloc(sys.lat.Nz * sizeof(double complex));
@@ -56,11 +86,40 @@ System defineSystem(int argc, char **argv) {
     sys.sol    = malloc(sys.lat.Nxyz  * sizeof(double complex));
     sys.res    = malloc(sys.lat.Nxyz  * sizeof(double complex));
     sys.error    = malloc(sys.lat.Nxyz  * sizeof(double complex));
+#endif
 
     return sys;
 }
 
 void clearMemory(System sys) {
+#if USE_CUFFTW
+    cudaFree(sys.a); sys.a = NULL;
+    cudaFree(sys.b); sys.b = NULL;
+    cudaFree(sys.c); sys.c = NULL;
+    cudaFree(sys.d); sys.d = NULL;
+    cudaFree(sys.ap); sys.ap = NULL;
+    cudaFree(sys.bp); sys.bp = NULL;
+    cudaFree(sys.cp); sys.cp = NULL;
+    cudaFree(sys.dp); sys.dp = NULL;
+    cudaFree(sys.am); sys.am = NULL;
+    cudaFree(sys.bm); sys.bm = NULL;
+    cudaFree(sys.cm); sys.cm = NULL;
+    cudaFree(sys.dm); sys.dm = NULL;
+
+    cudaFree(sys.k_bg_ext); sys.k_bg_ext = NULL;
+    cudaFree(sys.k2_bg_ext); sys.k2_bg_ext = NULL;
+
+    cudaFree(sys.sol_analytic); sys.sol_analytic = NULL;
+    cudaFree(sys.rhs); sys.rhs = NULL;
+    
+    cudaFree(sys.L); sys.L = NULL;
+    cudaFree(sys.U); sys.U = NULL;
+    cudaFree(sys.Up); sys.Up = NULL;
+
+    cudaFree(sys.sol); sys.sol = NULL;
+    cudaFree(sys.res); sys.res = NULL;
+    cudaFree(sys.error); sys.error = NULL;
+#else   
     free(sys.a); sys.a = NULL;
     free(sys.b); sys.b = NULL;
     free(sys.c); sys.c = NULL;
@@ -87,4 +146,5 @@ void clearMemory(System sys) {
     free(sys.sol); sys.sol = NULL;
     free(sys.res); sys.res = NULL;
     free(sys.error); sys.error = NULL;
+#endif
 }
