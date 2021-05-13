@@ -52,21 +52,25 @@ void DST( int              Nx,
 
 void solver( System sys ) {
 
-    PUSH_RANGE( "stream creation", 0 )
-    int          num_streams = 5;
-    cudaStream_t streams[num_streams];
-    for ( int i = 0; i < num_streams; i++ ) {
-        CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
-    }
-    POP_RANGE
+    // PUSH_RANGE( "stream creation", 0 )
+    // int          num_streams = 5;
+    // cudaStream_t streams[num_streams];
+    // for ( int i = 0; i < num_streams; i++ ) {
+    //     CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
+    // }
+    // POP_RANGE
 
-    PUSH_RANGE( "stream creation", 0 )
-    int         num_events = 5;
-    cudaEvent_t events[num_events];
-    for ( int i = 0; i < num_events; i++ ) {
-        CUDA_RT_CALL( cudaEventCreateWithFlags( &events[i], cudaEventDisableTiming ) );
-    }
-    POP_RANGE
+    // PUSH_RANGE( "stream creation", 0 )
+    // int         num_events = 5;
+    // cudaEvent_t events[num_events];
+    // for ( int i = 0; i < num_events; i++ ) {
+    //     CUDA_RT_CALL( cudaEventCreateWithFlags( &events[i], cudaEventDisableTiming ) );
+    // }
+    // POP_RANGE
+
+    PUSH_RANGE("solver", 0)
+
+    PUSH_RANGE("setup", 1)
 
     int    Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
     int    Nxy, Nxz, Nxyz;
@@ -81,7 +85,6 @@ void solver( System sys ) {
     Nxyz = Nx * Ny * Nz;
 
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &rhat ), sizeof( double complex ) * Nxyz, 1 ) );
-    // CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nz, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &y_a ), sizeof( double complex ) * Nxyz, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &xhat ), sizeof( double complex ) * Nxyz, 1 ) );
 
@@ -167,26 +170,35 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMemsetAsync( in2, size_in2, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, NULL ) );
 
+    POP_RANGE
+
+    PUSH_RANGE("DST1", 2)
     for ( l = 0; l < Nz; l++ ) {
         DST1( l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
     }
+    POP_RANGE
 
     /*
      Solution of the transformed system.
      */
 
+    PUSH_RANGE("trig", 3)
     triangular_solver_wrapper(NULL, sys, Nx, Ny, Nz, rhat, xhat, y_a);
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    POP_RANGE
 
     /*
      FFT transformation of the solution xhat layer by layer (z = const).
      and store the transformed vectors in the sol in the same order as xhat.
      */
 
+    PUSH_RANGE("DST2", 4)
     for ( l = 0; l < Nz; l++ ) {
         DST2( l, Nx, Ny, Nz, xhat, sys.sol, p1, in1, out1, p2, in2, out2 );
     }
+    POP_RANGE
 
+    PUSH_RANGE("Cleanup", 5)
     cufftDestroy( p1 );
     cudaFree( in1 );
     cudaFree( out1 );
@@ -200,6 +212,9 @@ void solver( System sys ) {
     y_a = NULL;
     cudaFree( xhat );
     xhat = NULL;
+    POP_RANGE
+
+    POP_RANGE
 
     return;
 }

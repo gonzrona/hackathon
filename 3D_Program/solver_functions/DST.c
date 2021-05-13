@@ -34,21 +34,21 @@ void DST1( const int l,
     /************************ X ***********************/
 
     load_1st_DST_wrapper( NULL, l, Nx, Ny, NR, rhs, in1 );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NR = 2 * Ny + 2;
     load_2st_DST_wrapper( NULL, l, Nx, Ny, NR, NC, out1, in2 );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NC = NR / 2 + 1;
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     store_1st_DST_wrapper( NULL, l, Nx, Ny, NR, NC, out2, rhat );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     return;
 }
@@ -76,21 +76,21 @@ void DST2( const int l,
     NC = NR / 2 + 1;
 
     load_3st_DST_wrapper( NULL, l, Nx, Ny, Nz, NR, xhat, in1 );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NR = 2 * Ny + 2;
     load_4st_DST_wrapper( NULL, l, Nx, Ny, NR, NC, out1, in2 );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NC = NR / 2 + 1;
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     store_2st_DST_wrapper( NULL, l, Nx, Ny, NR, NC, out2, sol );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
+    // CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     return;
 }

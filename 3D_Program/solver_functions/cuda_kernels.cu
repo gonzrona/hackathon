@@ -475,8 +475,8 @@ void triangular_solver_wrapper( const cudaStream_t     stream,
     int numSMs;
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
-    dim3 threadPerBlock { 1, 1 };
-    dim3 blocksPerGrid( 1, 1 );
+    dim3 threadPerBlock { 16, 16 };
+    dim3 blocksPerGrid( numSMs, numSMs );
 
     void *args[] { &Nx, &Ny, &Nz, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
 
