@@ -33,61 +33,22 @@ void DST1( const int l,
 
     /************************ X ***********************/
 
-    // for ( j = 0; j < Ny; j++ ) {
-    //     for ( i = 0; i < Nx; i++ ) {
-    //         in1[i + 1 + j * NR] = creal( rhs[( j * Nx + i ) + ( l * Nxy )] );
-    //     }
-    // }
-
-    load_1st_DST_wrapper( NULL, l, Nx, Ny, rhs, in1 );
+    load_1st_DST_wrapper( NULL, l, Nx, Ny, NR, rhs, in1 );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NR = 2 * Ny + 2;
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
-        }
-    }
+    load_2st_DST_wrapper( NULL, l, Nx, Ny, NR, NC, out1, in2 );
+    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NC = NR / 2 + 1;
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            rhat[( j * Nx + i ) + ( l * Nxy )].x = coef * out2[j + 1 + i * NC].y;
-        }
-    }
-
-    /************************ Y ***********************/
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in1[i + 1 + j * NR] = cimag( rhs[( j * Nx + i ) + ( l * Nxy )] );
-        }
-    }
-
-    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
+    store_1st_DST_wrapper( NULL, l, Nx, Ny, NR, NC, out2, rhat );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
-
-    NR = 2 * Ny + 2;
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
-        }
-    }
-
-    NC = NR / 2 + 1;
-    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            rhat[( j * Nx + i ) + ( l * Nxy )].y = coef * out2[j + 1 + i * NC].y;
-        }
-    }
 
     return;
 }

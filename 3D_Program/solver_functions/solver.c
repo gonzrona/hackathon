@@ -89,11 +89,11 @@ void solver( System sys ) {
      */
     int              i, j, l;
     int              m, NR, NC;
-    double *         in1, *in2;
-    cuDoubleComplex *out1, *out2;
+    double *         in1, *in2, *in3, *in4;
+    cuDoubleComplex *out1, *out2, *out3, *out4;
     // fftw_plan     p1, p2;
 
-    cufftHandle p1, p2;
+    cufftHandle p1, p2, p3, p4;
     size_t      workspace;
 
     m                  = Ny;
@@ -114,9 +114,26 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in1, size_in1, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out1, size_out1, 1 ) );
 
+    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in3, size_in1 * 2, 1 ) );
+    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out3, size_out1 * 2, 1 ) );
+
     CUDA_RT_CALL( cufftCreate( &p1 ) );
     CUDA_RT_CALL( cufftMakePlanMany(
         p1, rank1, nr1, inembed1, istride1, idist1, onembed1, ostride1, odist1, CUFFT_D2Z, howmany1, &workspace ) );
+
+    CUDA_RT_CALL( cufftCreate( &p3 ) );
+    CUDA_RT_CALL( cufftMakePlanMany( p3,
+                                     rank1,
+                                     nr1,
+                                     inembed1,
+                                     istride1,
+                                     idist1,
+                                     onembed1,
+                                     ostride1,
+                                     odist1,
+                                     CUFFT_D2Z,
+                                     ( howmany1 * 2 ),
+                                     &workspace ) );
 
     CUDA_RT_CALL( cudaMemsetAsync( in1, size_in1, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out1, size_out1, 0, NULL ) );
@@ -139,9 +156,26 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &in2 ), size_in2, 1 ) );
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &out2 ), size_out2, 1 ) );
 
+    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&in4, size_in1 * 2, 1 ) );
+    CUDA_RT_CALL( cudaMallocManaged( ( void ** )&out4, size_out1 * 2, 1 ) );
+
     CUDA_RT_CALL( cufftCreate( &p2 ) );
     CUDA_RT_CALL( cufftMakePlanMany(
         p2, rank2, nr2, inembed2, istride2, idist2, onembed2, ostride2, odist2, CUFFT_D2Z, howmany2, &workspace ) );
+
+    CUDA_RT_CALL( cufftCreate( &p4 ) );
+    CUDA_RT_CALL( cufftMakePlanMany( p4,
+                                     rank2,
+                                     nr2,
+                                     inembed2,
+                                     istride2,
+                                     idist2,
+                                     onembed2,
+                                     ostride2,
+                                     odist2,
+                                     CUFFT_D2Z,
+                                     ( howmany2 * 2 ),
+                                     &workspace ) );
 
     CUDA_RT_CALL( cudaMemsetAsync( in2, size_in2, 0, NULL ) );
     CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, NULL ) );
@@ -157,7 +191,7 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMallocManaged( ( void ** )( &bhat_i ), sizeof( double ) * Nxy, 1 ) );
 
     for ( l = 0; l < Nz; l++ ) {
-        DST1( l, Nx, Ny, sys.rhs, rhat, p1, in1, out1, p2, in2, out2 );
+        DST1( l, Nx, Ny, sys.rhs, rhat, p3, in3, out3, p4, in4, out4 );
     }
 
     /*
