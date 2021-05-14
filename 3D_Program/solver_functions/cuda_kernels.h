@@ -2,11 +2,11 @@
 
 #include <cuComplex.h>
 
-#include "../headers/structs.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "../headers/structs.h"
 
 void load_1st_DST_wrapper( const cudaStream_t streams,
                            int                l,

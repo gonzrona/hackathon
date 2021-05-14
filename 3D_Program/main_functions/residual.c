@@ -1,6 +1,5 @@
 #include "../headers/structs.h"
-#define INDEX(i,j,l,Nx,Ny) i+j*Nx+l*Nx*Ny
-
+#define INDEX( i, j, l, Nx, Ny ) i + j *Nx + l *Nx *Ny
 
 /*
  Find the residual
@@ -23,75 +22,101 @@
  bm - coefficient of the points differing in y on the (l-1)-level
  cm - coefficient of the points differing in x on the (l-1)-level
  dm - coefficient of the center points differing on the (l-1)-level
- 
+
  output:
  res          - residual
 
- 
+
  ========================================================================
- 
+
  NOTE:
  No user input required here; No changes should be made to this code.
- 
+
  Dr. Yury Gryazin, Ronald Gonzales, Yun Teck Lee 06/12/2018, ISU, Pocatello, ID
  */
 
-//void residual3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,
-//                double complex *SOL, double complex *res,double complex *rhs,double complex *a, double complex *b, double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp, double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm, double *k2_bg_ext){
-    
-void residual(System sys) {
-    
-    int Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
+// void residual3D(int Nx, int Ny, int Nz, double hx, double hy, double hz,
+//                double complex *SOL, double complex *res,double complex *rhs,double complex *a, double complex *b,
+//                double complex *c, double complex *d, double complex *ap, double complex *bp, double complex *cp,
+//                double complex *dp, double complex *am, double complex *bm, double complex *cm, double complex *dm,
+//                double *k2_bg_ext){
+
+void residual( System sys ) {
+
+    int    Nx = sys.lat.Nx, Ny = sys.lat.Ny, Nz = sys.lat.Nz;
     double complex *a = sys.a, *b = sys.b, *c = sys.c, *d = sys.d;
     double complex *am = sys.am, *bm = sys.bm, *cm = sys.cm, *dm = sys.dm;
     double complex *ap = sys.ap, *bp = sys.bp, *cp = sys.cp, *dp = sys.dp;
     double complex *rhs = sys.rhs, *res = sys.res;
-    
-    int i,j,l,Nxy;
-    Nxy = Nx*Ny;
-    
+
+    int i, j, l, Nxy;
+    Nxy = Nx * Ny;
+
     complex double *ext_SOL;
-    ext_SOL = malloc((Nx+2)*(Ny+2)*(Nz+2) * sizeof(complex double));
-    
-    for(i=0; i<(Nx+2)*(Ny+2)*(Nz+2);i++){
+    ext_SOL = malloc( ( Nx + 2 ) * ( Ny + 2 ) * ( Nz + 2 ) * sizeof( complex double ) );
+
+    for ( i = 0; i < ( Nx + 2 ) * ( Ny + 2 ) * ( Nz + 2 ); i++ ) {
         ext_SOL[i] = 0;
     }
-    
-    for(i = 0; i<Nx; i++){
-        for(j = 0; j< Ny;j++){
-            for(l=0; l<Nz;l++){
-                ext_SOL[i+1+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] = sys.sol[i+j*Nx+l*Nxy];
+
+    for ( i = 0; i < Nx; i++ ) {
+        for ( j = 0; j < Ny; j++ ) {
+            for ( l = 0; l < Nz; l++ ) {
+                ext_SOL[i + 1 + ( j + 1 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] =
+                    sys.sol[i + j * Nx + l * Nxy];
             }
         }
     }
 
     double _Complex top, middle, bottom;
-    for(i = 0; i<Nx; i++){
-        for(j = 0; j< Ny;j++){
-            for(l=0; l<Nz;l++){
-                
-                top = dp[l]*ext_SOL[i+1+(j+1)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)] + ap[l]*(ext_SOL[i+2+(j+2)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]+ext_SOL[i+(j+2)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]+ext_SOL[i+2+j*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]+ext_SOL[i+j*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]) + bp[l]*(ext_SOL[i+2+(j+1)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]+ext_SOL[i+(j+1)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]) + cp[l]*(ext_SOL[i+1+(j+2)*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]+ext_SOL[i+1+j*(Nx+2)+(l+2)*(Nx+2)*(Ny+2)]);
-                
-                middle = d[l]*ext_SOL[i+1+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)] + a[l]*(ext_SOL[i+2+(j+2)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ext_SOL[i+(j+2)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ext_SOL[i+2+j*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ext_SOL[i+j*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]) + b[l]*(ext_SOL[i+2+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ext_SOL[i+(j+1)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]) + c[l]*(ext_SOL[i+1+(j+2)*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]+ext_SOL[i+1+j*(Nx+2)+(l+1)*(Nx+2)*(Ny+2)]);
-                
-                bottom = dm[l]*ext_SOL[i+1+(j+1)*(Nx+2)+l*(Nx+2)*(Ny+2)] + am[l]*(ext_SOL[i+2+(j+2)*(Nx+2)+l*(Nx+2)*(Ny+2)]+ext_SOL[i+(j+2)*(Nx+2)+l*(Nx+2)*(Ny+2)]+ext_SOL[i+2+j*(Nx+2)+l*(Nx+2)*(Ny+2)]+ext_SOL[i+j*(Nx+2)+l*(Nx+2)*(Ny+2)]) + bm[l]*(ext_SOL[i+2+(j+1)*(Nx+2)+l*(Nx+2)*(Ny+2)]+ext_SOL[i+(j+1)*(Nx+2)+l*(Nx+2)*(Ny+2)]) + cm[l]*(ext_SOL[i+1+(j+2)*(Nx+2)+l*(Nx+2)*(Ny+2)]+ext_SOL[i+1+j*(Nx+2)+l*(Nx+2)*(Ny+2)]);
-                
-                res[i+j*Nx+l*Nxy] = (top + middle + bottom);
+    for ( i = 0; i < Nx; i++ ) {
+        for ( j = 0; j < Ny; j++ ) {
+            for ( l = 0; l < Nz; l++ ) {
+
+                top = dp[l] * ext_SOL[i + 1 + ( j + 1 ) * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                      ap[l] * ( ext_SOL[i + 2 + ( j + 2 ) * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                ext_SOL[i + ( j + 2 ) * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                ext_SOL[i + 2 + j * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                ext_SOL[i + j * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] ) +
+                      bp[l] * ( ext_SOL[i + 2 + ( j + 1 ) * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                ext_SOL[i + ( j + 1 ) * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] ) +
+                      cp[l] * ( ext_SOL[i + 1 + ( j + 2 ) * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                ext_SOL[i + 1 + j * ( Nx + 2 ) + ( l + 2 ) * ( Nx + 2 ) * ( Ny + 2 )] );
+
+                middle = d[l] * ext_SOL[i + 1 + ( j + 1 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                         a[l] * ( ext_SOL[i + 2 + ( j + 2 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                  ext_SOL[i + ( j + 2 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                  ext_SOL[i + 2 + j * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                  ext_SOL[i + j * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] ) +
+                         b[l] * ( ext_SOL[i + 2 + ( j + 1 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                  ext_SOL[i + ( j + 1 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] ) +
+                         c[l] * ( ext_SOL[i + 1 + ( j + 2 ) * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] +
+                                  ext_SOL[i + 1 + j * ( Nx + 2 ) + ( l + 1 ) * ( Nx + 2 ) * ( Ny + 2 )] );
+
+                bottom = dm[l] * ext_SOL[i + 1 + ( j + 1 ) * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] +
+                         am[l] * ( ext_SOL[i + 2 + ( j + 2 ) * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] +
+                                   ext_SOL[i + ( j + 2 ) * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] +
+                                   ext_SOL[i + 2 + j * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] +
+                                   ext_SOL[i + j * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] ) +
+                         bm[l] * ( ext_SOL[i + 2 + ( j + 1 ) * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] +
+                                   ext_SOL[i + ( j + 1 ) * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] ) +
+                         cm[l] * ( ext_SOL[i + 1 + ( j + 2 ) * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] +
+                                   ext_SOL[i + 1 + j * ( Nx + 2 ) + l * ( Nx + 2 ) * ( Ny + 2 )] );
+
+                res[i + j * Nx + l * Nxy] = ( top + middle + bottom );
             }
         }
     }
-    
-    
-    for(i=0; i<(Nx)*(Ny)*(Nz);i++){
+
+    for ( i = 0; i < ( Nx ) * ( Ny ) * ( Nz ); i++ ) {
         res[i] = res[i] - rhs[i];
     }
-    
-    for (i=0; i<sys.lat.Nxyz; i++) { sys.error[i] = sys.sol[i] - sys.sol_analytic[i]; }
-    
-    
-    free(ext_SOL);
+
+    for ( i = 0; i < sys.lat.Nxyz; i++ ) {
+        sys.error[i] = sys.sol[i] - sys.sol_analytic[i];
+    }
+
+    free( ext_SOL );
     ext_SOL = NULL;
     return;
-    
 }
-

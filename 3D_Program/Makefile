@@ -48,10 +48,10 @@ all: $(MAIN)
 	@echo  Program has been compiled
 
 $(MAIN): $(OBJS) $(CUOBJS)
-	$(NVCC) -ccbin $(CC) $(CFLAGS) $(INCLUDES) -o ${MAIN} ${OBJS} ${CUOBJS} $(LFLAGS) $(LIBS)
+	$(NVCC) -ccbin $(CC)  -std=c++11  $(CFLAGS) $(INCLUDES) -o ${MAIN} ${OBJS} ${CUOBJS} $(LFLAGS) $(LIBS)
 
 .c.o:
-	$(NVCC) -ccbin $(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(NVCC) -ccbin $(CC) $(CFLAGS) -std=c++11  -c $< -o $@
 
 %.o: %.cu
 	$(NVCC) ${THREADS} -ccbin $(CC) -std=c++11 -lineinfo $(CFLAGS) $(INCLUDES) ${ARCHES} -c $< -o $@
