@@ -57,7 +57,7 @@ void solver( System sys ) {
     PUSH_RANGE( "solver", 0 )
 
     PUSH_RANGE( "stream creation", 8 )
-    int          num_streams = 3;
+    int          num_streams = 2;
     cudaStream_t streams[num_streams];
     for ( int i = 0; i < num_streams; i++ ) {
         CUDA_RT_CALL( cudaStreamCreateWithFlags( &streams[i], cudaStreamNonBlocking ) );
@@ -65,7 +65,7 @@ void solver( System sys ) {
     POP_RANGE
 
     PUSH_RANGE( "event creation", 9 )
-    int         num_events = 2;
+    int         num_events = 1;
     cudaEvent_t events[num_events];
     for ( int i = 0; i < num_events; i++ ) {
         CUDA_RT_CALL( cudaEventCreateWithFlags( &events[i], cudaEventDisableTiming ) );
@@ -89,6 +89,11 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &rhat ), sizeof( double complex ) * Nxyz ) );
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &y_a ), sizeof( double complex ) * Nxyz ) );
     CUDA_RT_CALL( cudaMalloc( ( void ** )( &xhat ), sizeof( double complex ) * Nxyz ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, Nxyz * sizeof( double _Complex ), 0, streams[0] ) );
+
+    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, Nxyz * sizeof( double _Complex ), 0, streams[1] ) );
+    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
 
     /*
      FFT transformation of the rhs layer by layer (z = const).
@@ -178,16 +183,6 @@ void solver( System sys ) {
     CUDA_RT_CALL( cudaMemsetAsync( out2, size_out2, 0, streams[0] ) );
     POP_RANGE
 
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.rhs, Nxyz * sizeof( double _Complex ), 0, streams[0] ) );
-
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.U, Nxyz * sizeof( double _Complex ), 0, streams[1] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.L, Nxyz * sizeof( double _Complex ), 0, streams[1] ) );
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.Up, Nxyz * sizeof( double _Complex ), 0, streams[1] ) );
-    CUDA_RT_CALL( cudaEventRecord( events[0], streams[1] ) );
-
-    CUDA_RT_CALL( cudaMemPrefetchAsync( sys.sol, Nxyz * sizeof( double _Complex ), 0, streams[2] ) );
-    CUDA_RT_CALL( cudaEventRecord( events[1], streams[2] ) );
-
     POP_RANGE
 
     PUSH_RANGE( "DST1", 2 )
@@ -211,7 +206,7 @@ void solver( System sys ) {
      and store the transformed vectors in the sol in the same order as xhat.
      */
     PUSH_RANGE( "DST2", 4 )
-    CUDA_RT_CALL( cudaStreamWaitEvent( streams[0], events[1], cudaEventWaitDefault ) );  // Wait for sys.sol
+    CUDA_RT_CALL( cudaStreamWaitEvent( streams[0], events[0], cudaEventWaitDefault ) );  // Wait for sys.sol
     for ( l = 0; l < Nz; l++ ) {
         DST2( streams, l, Nx, Ny, Nz, xhat, sys.sol, p1, in1, out1, p2, in2, out2 );
     }
