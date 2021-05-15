@@ -1,4 +1,4 @@
-#include <complex.h>
+// #include <complex.h>
 
 #include <cuComplex.h>
 
@@ -8,7 +8,7 @@
 
 #include "lu_2nd_kernels.h"
 
-#define CMPLX( x, y ) __builtin_complex( ( double )( x ), ( double )( y ) )
+// #define CMPLX( x, y ) __builtin_complex( ( double )( x ), ( double )( y ) )
 
 __device__ cuda::std::complex<double> find_k2( const System sys, const int l ) {
     double z   = sys.lat.z0 + sys.lat.hz * l;
@@ -164,15 +164,15 @@ __global__ void __launch_bounds__( 256 )
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             for ( int l = 1; l < Nz; l++ ) {
                 int idx = tidY * Nxz + tidX * Nz + l;
-                temp    = cuda::std::complex<double>( sysU[l - 1 + tidX * Nz + tidY * Nxz].x,
-                                                   sysU[l - 1 + tidX * Nz + tidY * Nxz].y );
+                temp    = cuda::std::complex<double>( sysU[Nxz * tidY + Nz * tidX + (l - 1)].x,
+                                                   sysU[Nxz * tidY + Nz * tidX + (l - 1)].y );
                 temp *= find_ev3DM( sys, tidX, tidY, l );
                 sys.L[idx] = CMPLX( temp.real( ), temp.imag( ) );
 
-                temp = cuda::std::complex<double>( sysUp[l - 1 + tidX * Nz + tidY * Nxz].x,
-                                                   sysUp[l - 1 + tidX * Nz + tidY * Nxz].y );
-                temp *= cuda::std::complex<double>( sysL[l + tidX * Nz + tidY * Nxz].x,
-                                                    sysL[l + tidX * Nz + tidY * Nxz].y );
+                temp = cuda::std::complex<double>( sysUp[Nxz * tidY + Nz * tidX + (l - 1)].x,
+                                                   sysUp[Nxz * tidY + Nz * tidX + (l - 1)].y );
+                temp *= cuda::std::complex<double>( sysL[Nxz * tidY + Nz * tidX + l].x,
+                                                    sysL[Nxz * tidY + Nz * tidX + l].y );
 
                 temp       = 1.0 / ( find_ev3D( sys, tidX, tidY, l ) - temp );
                 sys.U[idx] = CMPLX( temp.real( ), temp.imag( ) );
