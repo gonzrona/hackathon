@@ -115,8 +115,15 @@ __global__ void __launch_bounds__( 256 ) load_3st_DST( const int l,
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
+#ifdef USE_INDEX
+            in1[tidY * NR + tidX + 1]                   = d_xhat[Nx * Ny * l + tidY * Nx + tidX].x;
+            in1[( NR * Ny ) + ( tidY * NR + tidX + 1 )] = d_xhat[Nx * Ny * l + tidY * Nx + tidX].y;
+            // printf("d_xhat - %d %d: %f %f\n", tidX, tidY, d_xhat[Nx * Ny * l + tidY * Nx + tidX].x, d_xhat[Nx * Ny * l + tidY * Nx + tidX].y);
+#else
             in1[tidY * NR + tidX + 1]                   = d_xhat[l + ( tidY * Nx + tidX ) * Nz].x;
             in1[( NR * Ny ) + ( tidY * NR + tidX + 1 )] = d_xhat[l + ( tidY * Nx + tidX ) * Nz].y;
+            // printf("d_xhat - %d %d: %f %f\n", tidX, tidY, d_xhat[l + ( tidY * Nx + tidX ) * Nz].x, d_xhat[l + ( tidY * Nx + tidX ) * Nz].y);
+#endif            
         }
     }
 }
@@ -171,6 +178,7 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    l,
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             d_sol[( tidY * Nx + tidX ) + ( l * Nx * Ny )].x = coef * out2[tidX * NC + tidY + 1].y;
             d_sol[( tidY * Nx + tidX ) + ( l * Nx * Ny )].y = coef * out2[( NC * Nx ) + ( tidX * NC + tidY + 1 )].y;
+            // printf("sol - %d %d: %f %f\n", tidX, tidY, d_sol[( tidY * Nx + tidX ) + ( l * Nx * Ny )].x, d_sol[( tidY * Nx + tidX ) + ( l * Nx * Ny )].y);     
         }
     }
 }
@@ -237,20 +245,20 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
                 // printf("L - %d %d %d: %f %f\n", tidX, tidY, l, d_SysL[Nxy * l + tidY * Nx + tidX].x, d_SysL[Nxy * l + tidY * Nx + tidX].y );
             }
 
-            d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )] =
+            d_xhat[Nxy * (Nz - 1) + tidY * Nx + tidX] =
                 cuCmul( d_y[idx_y + ( Nz - 1 )], d_SysU[Nxy * (Nz - 1) + tidY * Nx + tidX] );
                 // printf("U - %d %d %d: %f %f\n", tidX, tidY, 9, d_SysU[Nxy * (Nz - 1) + tidY * Nx + tidX].x, d_SysU[Nxy * (Nz - 1) + tidY * Nx + tidX].y );
-                // printf("x - %d %d %d: %f %f\n", tidX, tidY, 9, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y);     
+                // printf("x0 - %d %d %d: %f %f\n", tidX, tidY, 0, d_xhat[Nxy * (Nz - 1) + tidY * Nx + tidX].x, d_xhat[Nxy * (Nz - 1) + tidY * Nx + tidX].y);     
 
 
             for ( int l = Nz - 2; l >= 0; l-- ) {
-                d_xhat[Nxy * l + tidY * Nz + tidX] = cuCmul(
+                d_xhat[Nxy * l + tidY * Nx + tidX] = cuCmul(
                 cuCsub( d_y[idx_y + l],
-                cuCmul( d_SysUp[Nxy * l + tidY * Nx + tidX], d_xhat[Nxz * tidY + Nz * tidX + 1 + l] ) ),
+                cuCmul( d_SysUp[Nxy * l + tidY * Nx + tidX], d_xhat[Nxy * (l + 1) + tidY * Nx + tidX] ) ),
                 d_SysU[Nxy * l + tidY * Nx + tidX] );
                 // printf("Up - %d %d %d: %f %f\n", tidX, tidY, l, d_SysUp[Nxy * l + tidY * Nx + tidX].x, d_SysUp[Nxy * l + tidY * Nx + tidX].y );
                 // printf("U - %d %d %d: %f %f\n", tidX, tidY, l, d_SysU[Nxy * l + tidY * Nx + tidX].x, d_SysU[Nxy * l + tidY * Nx + tidX].y );
-                // printf("x - %d %d %d: %f %f\n", tidX, tidY, l, d_xhat[Nxy * l + tidY * Nz + tidX].x, d_xhat[Nxy * l + tidY * Nz + tidX].y);     
+                // printf("x1 - %d %d %d: %f %f\n", tidX, tidY, l, d_xhat[Nxy * l + tidY * Nz + tidX].x, d_xhat[Nxy * l + tidY * Nz + tidX].y);     
             }
         }
     }
@@ -290,7 +298,7 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
             d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )] =
                 cuCmul( d_y[idx_y + ( Nz - 1 )], d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )] );
                 // printf("U - %d %d %d: %f %f\n", tidX, tidY, 9, d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y );
-                // printf("x - %d %d %d: %f %f\n", tidX, tidY, 9, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y);     
+                // printf("x0 - %d %d %d: %f %f\n", tidX, tidY, 0, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y);     
 
             for ( int l = Nz - 2; l >= 0; l-- ) {
                 d_xhat[Nxz * tidY + Nz * tidX + l] = cuCmul(
@@ -299,7 +307,7 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
                     d_SysU[Nxz * tidY + Nz * tidX + l] );
                 // printf("Up - %d %d %d: %f %f\n", tidX, tidY, l, d_SysUp[Nxz * tidY + Nz * tidX + l].x, d_SysUp[Nxz * tidY + Nz * tidX + l].y );
                 // printf("U - %d %d %d: %f %f\n", tidX, tidY, l, d_SysU[Nxz * tidY + Nz * tidX + l].x, d_SysU[Nxz * tidY + Nz * tidX + l].y );
-                // printf("x - %d %d %d: %f %f\n", tidX, tidY, l, d_xhat[Nxz * tidY + Nz * tidX + l].x, d_xhat[Nxz * tidY + Nz * tidX + l].y);     
+                // printf("x1 - %d %d %d: %f %f\n", tidX, tidY, l, d_xhat[Nxz * tidY + Nz * tidX + l].x, d_xhat[Nxz * tidY + Nz * tidX + l].y);     
             }
         }
     }

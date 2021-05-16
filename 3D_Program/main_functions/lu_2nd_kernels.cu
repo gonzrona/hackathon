@@ -115,7 +115,7 @@ __device__ cuda::std::complex<double> find_ev3DM( const System sys, const int i,
 }
 
 #ifdef USE_INDEX
-__global__ void __launch_bounds__( 256 ) create_2th_setup( System sys ) {
+__global__ void create_2th_setup( System sys ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -128,23 +128,21 @@ __global__ void __launch_bounds__( 256 ) create_2th_setup( System sys ) {
     // const int Nz  = sys.lat.Nz;
 
     cuda::std::complex<double> temp;
-    cuda::std::complex<double> temp1;
-    cuda::std::complex<double> temp2;
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             int idx = tidY * Nx + tidX;
             temp        = 0.0;
             sys.L[idx]  = CMPLX( temp.real( ), temp.imag( ) );
-            temp1       = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
-            sys.U[idx]  = CMPLX( temp1.real( ), temp1.imag( ) );
-            temp2       = find_ev3DP( sys, tidX, tidY, 0 );
-            sys.Up[idx] = CMPLX( temp2.real( ), temp2.imag( ) );
+            temp       = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
+            sys.U[idx]  = CMPLX( temp.real( ), temp.imag( ) );
+            temp       = find_ev3DP( sys, tidX, tidY, 0 );
+            sys.Up[idx] = CMPLX( temp.real( ), temp.imag( ) );
         }
     }
 }
 
-__global__ void __launch_bounds__( 256 )
+__global__ void 
     create_2th_order( System sys, cuDoubleComplex *sysU, cuDoubleComplex *sysL, cuDoubleComplex *sysUp ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
@@ -188,7 +186,7 @@ __global__ void __launch_bounds__( 256 )
     }
 }
 #else
-__global__ void __launch_bounds__( 256 ) create_2th_setup( System sys ) {
+__global__ void create_2th_setup( System sys ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -202,23 +200,21 @@ __global__ void __launch_bounds__( 256 ) create_2th_setup( System sys ) {
     const int Nxz = Nx * sys.lat.Nz;
 
     cuda::std::complex<double> temp;
-    cuda::std::complex<double> temp1;
-    cuda::std::complex<double> temp2;
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             int idx     = tidY * Nxz + tidX * Nz;
             temp        = 0.0;
             sys.L[idx]  = CMPLX( temp.real( ), temp.imag( ) );
-            temp1       = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
-            sys.U[idx]  = CMPLX( temp1.real( ), temp1.imag( ) );
-            temp2       = find_ev3DP( sys, tidX, tidY, 0 );
-            sys.Up[idx] = CMPLX( temp2.real( ), temp2.imag( ) );
+            temp       = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
+            sys.U[idx]  = CMPLX( temp.real( ), temp.imag( ) );
+            temp       = find_ev3DP( sys, tidX, tidY, 0 );
+            sys.Up[idx] = CMPLX( temp.real( ), temp.imag( ) );
         }
     }
 }
 
-__global__ void __launch_bounds__( 256 )
+__global__ void 
     create_2th_order( System sys, cuDoubleComplex *sysU, cuDoubleComplex *sysL, cuDoubleComplex *sysUp ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
@@ -269,7 +265,7 @@ void create_2th_order_wrapper( System sys ) {
     CUDA_RT_CALL( cudaDeviceGetAttribute( &numSMs, cudaDevAttrMultiProcessorCount, 0 ) );
 
     dim3 threadPerBlock { 16, 16 };
-    dim3 blocksPerGrid( numSMs, numSMs );
+    dim3 blocksPerGrid( 16, 16 );
 
     void *args[] { &sys };
     void *args2[] { &sys, &sys.U, &sys.L, &sys.Up };
