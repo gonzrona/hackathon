@@ -36,9 +36,9 @@ else
 	LIBS += -lfftw3_omp -lfftw3
 endif
 
-ifneq ($(origin USE_OMP), undefined)
-	ifneq ($(USE_OMP), 0)
-		CFLAGS += -DUSE_OMP
+ifneq ($(origin USE_INDEX), undefined)
+	ifneq ($(USE_INDEX), 0)
+		CFLAGS += -DUSE_INDEX
 	endif
 endif
 

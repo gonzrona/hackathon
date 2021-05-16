@@ -205,6 +205,57 @@ __global__ void __launch_bounds__( 256 ) store_2st_DST( const int    l,
 //     }
 // }
 
+#ifdef USE_INDEX
+__global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
+    const int Ny,
+    const int Nz,
+    const cuDoubleComplex *__restrict__ d_SysU,
+    const cuDoubleComplex *__restrict__ d_SysL,
+    const cuDoubleComplex *__restrict__ d_SysUp,
+    const cuDoubleComplex *__restrict__ d_rhat,
+    cuDoubleComplex *__restrict__ d_xhat,
+    cuDoubleComplex *__restrict__ d_y ) {
+    const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
+    const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
+
+    const int ty { static_cast<int>( blockIdx.y * blockDim.y + threadIdx.y ) };
+    const int strideY { static_cast<int>( blockDim.y * gridDim.y ) };
+
+    const int Nxy = Nx * Ny;
+    const int Nxz = Nx * Nz;
+
+    for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
+        for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
+
+            int idx_y = ( tidY * Nx + tidX ) * Nz;
+
+            d_y[idx_y] = d_rhat[tidY * Nx + tidX];
+
+            for ( int l = 1; l < Nz; l++ ) {
+                d_y[idx_y + l] = cuCsub( d_rhat[Nxy * l + tidY * Nx + tidX],
+                cuCmul( d_SysL[Nxy * l + tidY * Nx + tidX], d_y[idx_y + ( l - 1 )] ) );
+                // printf("L - %d %d %d: %f %f\n", tidX, tidY, l, d_SysL[Nxy * l + tidY * Nx + tidX].x, d_SysL[Nxy * l + tidY * Nx + tidX].y );
+            }
+
+            d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )] =
+                cuCmul( d_y[idx_y + ( Nz - 1 )], d_SysU[Nxy * (Nz - 1) + tidY * Nx + tidX] );
+                // printf("U - %d %d %d: %f %f\n", tidX, tidY, 9, d_SysU[Nxy * (Nz - 1) + tidY * Nx + tidX].x, d_SysU[Nxy * (Nz - 1) + tidY * Nx + tidX].y );
+                // printf("x - %d %d %d: %f %f\n", tidX, tidY, 9, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y);     
+
+
+            for ( int l = Nz - 2; l >= 0; l-- ) {
+                d_xhat[Nxy * l + tidY * Nz + tidX] = cuCmul(
+                cuCsub( d_y[idx_y + l],
+                cuCmul( d_SysUp[Nxy * l + tidY * Nx + tidX], d_xhat[Nxz * tidY + Nz * tidX + 1 + l] ) ),
+                d_SysU[Nxy * l + tidY * Nx + tidX] );
+                // printf("Up - %d %d %d: %f %f\n", tidX, tidY, l, d_SysUp[Nxy * l + tidY * Nx + tidX].x, d_SysUp[Nxy * l + tidY * Nx + tidX].y );
+                // printf("U - %d %d %d: %f %f\n", tidX, tidY, l, d_SysU[Nxy * l + tidY * Nx + tidX].x, d_SysU[Nxy * l + tidY * Nx + tidX].y );
+                // printf("x - %d %d %d: %f %f\n", tidX, tidY, l, d_xhat[Nxy * l + tidY * Nz + tidX].x, d_xhat[Nxy * l + tidY * Nz + tidX].y);     
+            }
+        }
+    }
+}
+#else
 __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
                                                             const int Ny,
                                                             const int Nz,
@@ -233,20 +284,27 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
             for ( int l = 1; l < Nz; l++ ) {
                 d_y[idx_y + l] = cuCsub( d_rhat[Nxy * l + tidY * Nx + tidX],
                                          cuCmul( d_SysL[Nxz * tidY + Nz * tidX + l], d_y[idx_y + ( l - 1 )] ) );
+                // printf("L - %d %d %d: %f %f\n", tidX, tidY, l, d_SysL[Nxz * tidY + Nz * tidX + l].x, d_SysL[Nxz * tidY + Nz * tidX + l].y );
             }
 
             d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )] =
                 cuCmul( d_y[idx_y + ( Nz - 1 )], d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )] );
+                // printf("U - %d %d %d: %f %f\n", tidX, tidY, 9, d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_SysU[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y );
+                // printf("x - %d %d %d: %f %f\n", tidX, tidY, 9, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].x, d_xhat[Nxz * tidY + Nz * tidX + ( Nz - 1 )].y);     
 
             for ( int l = Nz - 2; l >= 0; l-- ) {
                 d_xhat[Nxz * tidY + Nz * tidX + l] = cuCmul(
                     cuCsub( d_y[idx_y + l],
                             cuCmul( d_SysUp[Nxz * tidY + Nz * tidX + l], d_xhat[Nxz * tidY + Nz * tidX + 1 + l] ) ),
                     d_SysU[Nxz * tidY + Nz * tidX + l] );
+                // printf("Up - %d %d %d: %f %f\n", tidX, tidY, l, d_SysUp[Nxz * tidY + Nz * tidX + l].x, d_SysUp[Nxz * tidY + Nz * tidX + l].y );
+                // printf("U - %d %d %d: %f %f\n", tidX, tidY, l, d_SysU[Nxz * tidY + Nz * tidX + l].x, d_SysU[Nxz * tidY + Nz * tidX + l].y );
+                // printf("x - %d %d %d: %f %f\n", tidX, tidY, l, d_xhat[Nxz * tidY + Nz * tidX + l].x, d_xhat[Nxz * tidY + Nz * tidX + l].y);     
             }
         }
     }
 }
+#endif
 
 // // #pragma omp for
 // //   for (j = 0; j < Ny; j++) {
@@ -477,6 +535,8 @@ void triangular_solver_wrapper( const cudaStream_t     stream,
 
     dim3 threadPerBlock { 16, 16 };
     dim3 blocksPerGrid( numSMs, numSMs );
+
+    printf("***************************\n");
 
     void *args[] { &Nx, &Ny, &Nz, &sys.U, &sys.L, &sys.Up, &d_rhat, &d_xhat, &d_y };
 
