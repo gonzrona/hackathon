@@ -230,7 +230,6 @@ __global__ void __launch_bounds__( 256 ) triangular_solver( const int Nx,
     const int strideY { static_cast<int>( blockDim.y * gridDim.y ) };
 
     const int Nxy = Nx * Ny;
-    const int Nxz = Nx * Nz;
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {

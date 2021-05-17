@@ -1,5 +1,3 @@
-// #include <complex.h>
-
 #include <cuComplex.h>
 
 #include <cuda/std/complex>
@@ -8,7 +6,7 @@
 
 #include "lu_2nd_kernels.h"
 
-// #define CMPLX( x, y ) __builtin_complex( ( double )( x ), ( double )( y ) )
+#define CMPLX( x, y ) __builtin_complex( ( double )( x ), ( double )( y ) )
 
 __device__ cuda::std::complex<double> find_k2( const System sys, const int l ) {
     double z   = sys.lat.z0 + sys.lat.hz * l;
@@ -115,7 +113,7 @@ __device__ cuda::std::complex<double> find_ev3DM( const System sys, const int i,
 }
 
 #ifdef USE_INDEX
-__global__ void create_2th_setup( System sys ) {
+__global__ void __launch_bounds__( 256 ) create_2th_setup( System sys ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -123,26 +121,26 @@ __global__ void create_2th_setup( System sys ) {
     const int ty { static_cast<int>( blockIdx.y * blockDim.y + threadIdx.y ) };
     const int strideY { static_cast<int>( blockDim.y * gridDim.y ) };
 
-    const int Nx  = sys.lat.Nx;
-    const int Ny  = sys.lat.Ny;
+    const int Nx = sys.lat.Nx;
+    const int Ny = sys.lat.Ny;
     // const int Nz  = sys.lat.Nz;
 
     cuda::std::complex<double> temp;
 
     for ( int tidY = ty; tidY < Ny; tidY += strideY ) {
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
-            int idx = tidY * Nx + tidX;
+            int idx     = tidY * Nx + tidX;
             temp        = 0.0;
             sys.L[idx]  = CMPLX( temp.real( ), temp.imag( ) );
-            temp       = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
+            temp        = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
             sys.U[idx]  = CMPLX( temp.real( ), temp.imag( ) );
-            temp       = find_ev3DP( sys, tidX, tidY, 0 );
+            temp        = find_ev3DP( sys, tidX, tidY, 0 );
             sys.Up[idx] = CMPLX( temp.real( ), temp.imag( ) );
         }
     }
 }
 
-__global__ void 
+__global__ void __launch_bounds__( 256 )
     create_2th_order( System sys, cuDoubleComplex *sysU, cuDoubleComplex *sysL, cuDoubleComplex *sysUp ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
@@ -163,14 +161,14 @@ __global__ void
             for ( int l = 1; l < Nz; l++ ) {
                 int idx = Nxy * l + tidY * Nx + tidX;
 
-                temp    = cuda::std::complex<double>( sysU[Nxy * (l - 1) + tidY * Nx + tidX].x,
-                                                   sysU[Nxy * (l - 1) + tidY * Nx + tidX].y );
+                temp = cuda::std::complex<double>( sysU[Nxy * ( l - 1 ) + tidY * Nx + tidX].x,
+                                                   sysU[Nxy * ( l - 1 ) + tidY * Nx + tidX].y );
                 temp *= find_ev3DM( sys, tidX, tidY, l );
                 sys.L[idx] = CMPLX( temp.real( ), temp.imag( ) );
                 // printf("L - %d %d %d: %f %f\n", tidX, tidY, l, temp.real( ), temp.imag( ) );
 
-                temp = cuda::std::complex<double>( sysUp[Nxy * (l - 1) + tidY * Nx + tidX].x,
-                                                    sysUp[Nxy * (l - 1) + tidY * Nx + tidX].y );
+                temp = cuda::std::complex<double>( sysUp[Nxy * ( l - 1 ) + tidY * Nx + tidX].x,
+                                                   sysUp[Nxy * ( l - 1 ) + tidY * Nx + tidX].y );
                 temp *= cuda::std::complex<double>( sysL[Nxy * l + tidY * Nx + tidX].x,
                                                     sysL[Nxy * l + tidY * Nx + tidX].y );
 
@@ -186,7 +184,7 @@ __global__ void
     }
 }
 #else
-__global__ void create_2th_setup( System sys ) {
+__global__ void __launch_bounds__( 256 ) create_2th_setup( System sys ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
     const int strideX { static_cast<int>( blockDim.x * gridDim.x ) };
@@ -206,15 +204,15 @@ __global__ void create_2th_setup( System sys ) {
             int idx     = tidY * Nxz + tidX * Nz;
             temp        = 0.0;
             sys.L[idx]  = CMPLX( temp.real( ), temp.imag( ) );
-            temp       = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
+            temp        = 1.0 / find_ev3D( sys, tidX, tidY, 0 );
             sys.U[idx]  = CMPLX( temp.real( ), temp.imag( ) );
-            temp       = find_ev3DP( sys, tidX, tidY, 0 );
+            temp        = find_ev3DP( sys, tidX, tidY, 0 );
             sys.Up[idx] = CMPLX( temp.real( ), temp.imag( ) );
         }
     }
 }
 
-__global__ void 
+__global__ void __launch_bounds__( 256 )
     create_2th_order( System sys, cuDoubleComplex *sysU, cuDoubleComplex *sysL, cuDoubleComplex *sysUp ) {
 
     const int tx { static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x ) };
@@ -234,15 +232,15 @@ __global__ void
         for ( int tidX = tx; tidX < Nx; tidX += strideX ) {
             for ( int l = 1; l < Nz; l++ ) {
                 int idx = tidY * Nxz + tidX * Nz + l;
-                temp    = cuda::std::complex<double>( sysU[Nxz * tidY + Nz * tidX + (l - 1)].x,
-                                                   sysU[Nxz * tidY + Nz * tidX + (l - 1)].y );
+                temp    = cuda::std::complex<double>( sysU[Nxz * tidY + Nz * tidX + ( l - 1 )].x,
+                                                   sysU[Nxz * tidY + Nz * tidX + ( l - 1 )].y );
 
                 temp *= find_ev3DM( sys, tidX, tidY, l );
                 sys.L[idx] = CMPLX( temp.real( ), temp.imag( ) );
                 // printf("L - %d %d %d: %f %f\n", tidX, tidY, l, temp.real( ), temp.imag( ) );
 
-                temp = cuda::std::complex<double>( sysUp[Nxz * tidY + Nz * tidX + (l - 1)].x,
-                                                   sysUp[Nxz * tidY + Nz * tidX + (l - 1)].y );
+                temp = cuda::std::complex<double>( sysUp[Nxz * tidY + Nz * tidX + ( l - 1 )].x,
+                                                   sysUp[Nxz * tidY + Nz * tidX + ( l - 1 )].y );
                 temp *= cuda::std::complex<double>( sysL[Nxz * tidY + Nz * tidX + l].x,
                                                     sysL[Nxz * tidY + Nz * tidX + l].y );
 
