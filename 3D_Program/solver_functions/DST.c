@@ -10,9 +10,10 @@
 
 #ifdef USE_CUFFTW
 
-void DST1( const int l,
-           const int Nx,
-           const int Ny,
+void DST1( const cudaStream_t *streams,
+           const int           l,
+           const int           Nx,
+           const int           Ny,
            double complex * rhs,
            cuDoubleComplex *rhat,
            cufftHandle      p1,
@@ -31,69 +32,26 @@ void DST1( const int l,
     NR = 2 * Nx + 2;
     NC = NR / 2 + 1;
 
-    /************************ X ***********************/
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in1[i + 1 + j * NR] = creal( rhs[( j * Nx + i ) + ( l * Nxy )] );
-        }
-    }
+    load_1st_DST_wrapper( streams[0], l, Nx, Ny, NR, rhs, in1 );
 
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NR = 2 * Ny + 2;
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
-        }
-    }
+    load_2st_DST_wrapper( streams[0], l, Nx, Ny, NR, NC, out1, in2 );
 
     NC = NR / 2 + 1;
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            rhat[( j * Nx + i ) + ( l * Nxy )].x = coef * out2[j + 1 + i * NC].y;
-        }
-    }
-
-    /************************ Y ***********************/
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in1[i + 1 + j * NR] = cimag( rhs[( j * Nx + i ) + ( l * Nxy )] );
-        }
-    }
-
-    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
-
-    NR = 2 * Ny + 2;
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
-        }
-    }
-
-    NC = NR / 2 + 1;
-    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            rhat[( j * Nx + i ) + ( l * Nxy )].y = coef * out2[j + 1 + i * NC].y;
-        }
-    }
+    store_1st_DST_wrapper( streams[0], l, Nx, Ny, NR, NC, out2, rhat );
 
     return;
 }
 
-void DST2( const int l,
-           const int Nx,
-           const int Ny,
-           const int Nz,
+void DST2( const cudaStream_t *streams,
+           const int           l,
+           const int           Nx,
+           const int           Ny,
+           const int           Nz,
            double complex * xhat,
            cuDoubleComplex *sol,
            cufftHandle      p1,
@@ -112,61 +70,17 @@ void DST2( const int l,
     NR = 2 * Nx + 2;
     NC = NR / 2 + 1;
 
-    /************************ X ***********************/
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in1[i + 1 + j * NR] = creal( xhat[l + ( ( j * Nx + i ) * Nz )] );
-        }
-    }
+    load_3st_DST_wrapper( streams[0], l, Nx, Ny, Nz, NR, xhat, in1 );
 
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
     NR = 2 * Ny + 2;
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
-        }
-    }
+    load_4st_DST_wrapper( streams[0], l, Nx, Ny, NR, NC, out1, in2 );
 
     NC = NR / 2 + 1;
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            sol[( j * Nx + i ) + ( l * Nxy )].x = coef * out2[j + 1 + i * NC].y;
-        }
-    }
-
-    /************************ Y ***********************/
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in1[i + 1 + j * NR] = cimag( xhat[l + ( ( j * Nx + i ) * Nz )] );
-        }
-    }
-
-    CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
-
-    NR = 2 * Ny + 2;
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            in2[j + 1 + i * NR] = out1[i + 1 + j * NC].y;
-        }
-    }
-
-    NC = NR / 2 + 1;
-    CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
-    CUDA_RT_CALL( cudaDeviceSynchronize( ) );
-
-    for ( j = 0; j < Ny; j++ ) {
-        for ( i = 0; i < Nx; i++ ) {
-            sol[( j * Nx + i ) + ( l * Nxy )].y = coef * out2[j + 1 + i * NC].y;
-        }
-    }
+    store_2st_DST_wrapper( streams[0], l, Nx, Ny, NR, NC, out2, sol );
 
     return;
 }
@@ -194,7 +108,6 @@ void DST( const int        Nx,
         }
     }
 
-    // fftw_execute( p1 );
     CUDA_RT_CALL( cufftExecD2Z( p1, in1, out1 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
@@ -214,7 +127,6 @@ void DST( const int        Nx,
 
     NC = NR / 2 + 1;
 
-    // fftw_execute( p2 );
     CUDA_RT_CALL( cufftExecD2Z( p2, in2, out2 ) );
     CUDA_RT_CALL( cudaDeviceSynchronize( ) );
 
